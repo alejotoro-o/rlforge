@@ -1,0 +1,2 @@
+from rlforge.function_approximation.linear_regression import LinearRegression
+from rlforge.function_approximation.mlp import MLP
