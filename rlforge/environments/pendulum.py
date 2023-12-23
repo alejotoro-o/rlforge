@@ -11,7 +11,7 @@ class Pendulum(gym.Env):
         self.m = m
         self.l = l
         self.dt = dt
-        self.thetap_range = [-2*np.pi,2*np.pi]
+        self.thetap_range = (-2*np.pi,2*np.pi)
         self.continuous = continuous
 
         if not self.continuous:
