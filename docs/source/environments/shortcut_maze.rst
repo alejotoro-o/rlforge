@@ -1,0 +1,2 @@
+.. automodule:: rlforge.environments.shortcut_maze
+   :members:

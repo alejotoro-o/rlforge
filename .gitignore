@@ -4,3 +4,4 @@ tests
 examples/.venv
 dist
 rlforge.egg-info
+docs/build

@@ -1,11 +1,24 @@
+"""
+Trajectory Tracking
+===================
+"""
+
 import gymnasium as gym
 import numpy as np
 
 class TrajectoryTracking(gym.Env):
+    
+    """
+    
+    """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     def __init__(self, x_range = (-2,2), y_range = (-2,2), initial_state=(0,0,0), trajectory=[(1,1)], d_min = 0.05, obstacles=[], dt=0.01):
+
+        """
+        
+        """
         
         self.initial_state = initial_state
         self.trajectory = trajectory
@@ -24,6 +37,10 @@ class TrajectoryTracking(gym.Env):
         )
 
     def step(self, action):
+
+        """
+        
+        """
 
         prev_x, prev_y, prev_theta = self.prev_state[0:3]
 
@@ -77,6 +94,10 @@ class TrajectoryTracking(gym.Env):
     
     def reset(self):
 
+        """
+        
+        """
+
         self.waypoint = 0
 
         new_state = np.array([self.initial_state[0], self.initial_state[1], self.initial_state[2]])
@@ -89,5 +110,5 @@ class TrajectoryTracking(gym.Env):
 
         return observation
     
-    def render(self):
-        pass
+    # def render(self):
+    #     pass

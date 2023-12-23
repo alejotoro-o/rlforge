@@ -1,11 +1,24 @@
+"""
+Mecanum Car
+===========
+"""
+
 import gymnasium as gym
 import numpy as np
 
 class MecanumCar(gym.Env):
+    
+    """
+    
+    """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     def __init__(self, x_range = (-2,2), y_range = (-2,2), initial_state=(0,0,0), target=(1,1,0.1), dt=0.01):
+        
+        """
+        
+        """
         
         self.initial_state = initial_state
         self.target = target
@@ -30,6 +43,10 @@ class MecanumCar(gym.Env):
         # )
 
     def step(self, action):
+        
+        """
+        
+        """
 
         prev_x, prev_y, prev_theta = self.prev_state[0:3]
 
@@ -69,6 +86,11 @@ class MecanumCar(gym.Env):
         return observation
     
     def reset(self):
+        
+
+        """
+        
+        """
 
         error = np.sqrt((self.target[0] - self.initial_state[0])**2 + (self.target[1] - self.initial_state[1])**2)
         heading_error = self.initial_state[2] - np.arctan2((self.target[1] - self.initial_state[1]),(self.target[0] - self.initial_state[0]))
@@ -84,5 +106,5 @@ class MecanumCar(gym.Env):
 
         return observation
     
-    def render(self):
-        pass
+    # def render(self):
+    #     pass

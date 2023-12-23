@@ -1,3 +1,8 @@
+"""
+Dyna Maze
+=========
+"""
+
 from typing import Optional
 import numpy as np
 
@@ -12,9 +17,18 @@ LEFT = 3
 
 class DynaMaze(gym.Env):
 
+    """
+    
+    """
+
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, render_mode=None):
+
+        """
+        
+        """
+        
         self.shape = (6,9)
         self.start_state_index = np.ravel_multi_index((2, 0), self.shape)
 
@@ -47,6 +61,11 @@ class DynaMaze(gym.Env):
         self.render_mode = render_mode
 
     def _limit_coordinates(self, coord: np.ndarray) -> np.ndarray:
+
+        """
+        
+        """
+
         """Prevent the agent from falling out of the grid world."""
         coord[0] = min(coord[0], self.shape[0] - 1)
         coord[0] = max(coord[0], 0)
@@ -55,7 +74,8 @@ class DynaMaze(gym.Env):
         return coord
 
     def _calculate_transition_prob(self, current_position, delta):
-        """Determine the outcome for an action. Transition Prob is always 1.0.
+        """
+        Determine the outcome for an action. Transition Prob is always 1.0.
         Args:
             current: Current position on the grid as (row, col)
             delta: Change in position for transition
@@ -77,6 +97,11 @@ class DynaMaze(gym.Env):
         return [(1.0, new_state, 0, False)]
 
     def step(self, a):
+
+        """
+        
+        """
+
         transitions = self.P[self.s][a]
         i = categorical_sample([t[0] for t in transitions], self.np_random)
         p, s, r, t = transitions[i]
@@ -89,6 +114,11 @@ class DynaMaze(gym.Env):
         return (int(s), r, t, False, {"prob": p})
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+
+        """
+        
+        """
+        
         super().reset(seed=seed)
         self.s = categorical_sample(self.initial_state_distrib, self.np_random)
         self.lastaction = None
@@ -97,5 +127,5 @@ class DynaMaze(gym.Env):
             self.render()
         return int(self.s), {"prob": 1}
 
-    def render(self):
-        pass
+    # def render(self):
+    #     pass

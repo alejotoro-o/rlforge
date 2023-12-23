@@ -1,2 +1,2 @@
-Pendulum
-========
+.. automodule:: rlforge.environments.pendulum
+   :members:

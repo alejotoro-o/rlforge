@@ -6,6 +6,10 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath('../..'))
+
 project = 'rlforge'
 copyright = '2023, Alejandro Toro-Ossaba'
 author = 'Alejandro Toro-Ossaba'
@@ -15,7 +19,8 @@ release = '0.0.2'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx_rtd_theme',
+    "sphinx_rtd_theme",
+    "sphinx.ext.autodoc"
 ]
 
 templates_path = ['_templates']

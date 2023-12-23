@@ -1,2 +1,0 @@
-Epsilon Greedy Policy
-=====================

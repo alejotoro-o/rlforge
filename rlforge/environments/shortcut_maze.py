@@ -1,3 +1,8 @@
+"""
+Shortcut Maze
+=============
+"""
+
 from typing import Optional
 import numpy as np
 
@@ -12,9 +17,18 @@ LEFT = 3
 
 class ShortcutMaze(gym.Env):
 
+    """
+    
+    """
+
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, shortcut_episodes = 20, render_mode=None):
+
+        """
+        
+        """
+
         self.shape = (6,9)
         self.start_state_index = np.ravel_multi_index((5, 3), self.shape)
         self.shortcut_episodes = shortcut_episodes
@@ -58,7 +72,11 @@ class ShortcutMaze(gym.Env):
         self.render_mode = render_mode
 
     def _limit_coordinates(self, coord: np.ndarray) -> np.ndarray:
-        """Prevent the agent from falling out of the grid world."""
+
+        """
+        Prevent the agent from falling out of the grid world.
+        """
+
         coord[0] = min(coord[0], self.shape[0] - 1)
         coord[0] = max(coord[0], 0)
         coord[1] = min(coord[1], self.shape[1] - 1)
@@ -66,13 +84,16 @@ class ShortcutMaze(gym.Env):
         return coord
 
     def _calculate_transition_prob(self, current_position, delta):
-        """Determine the outcome for an action. Transition Prob is always 1.0.
+
+        """
+        Determine the outcome for an action. Transition Prob is always 1.0.
         Args:
             current: Current position on the grid as (row, col)
             delta: Change in position for transition
         Returns:
             Tuple of ``(1.0, new_state, reward, terminated)``
         """
+
         new_position = np.array(current_position) + np.array(delta)
         new_position = self._limit_coordinates(new_position).astype(int)
         new_state = np.ravel_multi_index(tuple(new_position), self.shape)
@@ -88,6 +109,10 @@ class ShortcutMaze(gym.Env):
         return [(1.0, new_state, 0, False)]
 
     def step(self, a):
+
+        """
+        
+        """
 
         if self.elapsed_episodes < self.shortcut_episodes:
             transitions = self.P1[self.s][a]
@@ -109,6 +134,11 @@ class ShortcutMaze(gym.Env):
         return (int(s), r, t, False, {"prob": p})
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+
+        """
+        
+        """
+        
         super().reset(seed=seed)
         self.s = categorical_sample(self.initial_state_distrib, self.np_random)
         self.lastaction = None
@@ -117,5 +147,5 @@ class ShortcutMaze(gym.Env):
             self.render()
         return int(self.s), {"prob": 1}
 
-    def render(self):
-        pass
+    # def render(self):
+    #     pass

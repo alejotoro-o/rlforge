@@ -1,11 +1,26 @@
+"""
+Pendulum
+========
+
+
+"""
+
 import numpy as np
 import gymnasium as gym
 
 class Pendulum(gym.Env):
 
+    """
+    
+    """
+
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     def __init__(self, continuous = False, g = 9.81, m = float(1/3), l = float(3/2), dt = 0.05):
+
+        """
+        
+        """
 
         self.g = g
         self.m = m
@@ -22,6 +37,10 @@ class Pendulum(gym.Env):
             self.action_range = (-2,2)
 
     def step(self, action):
+
+        """
+        
+        """
         
         prev_theta, prev_thetap = self.prev_state
 
@@ -55,6 +74,10 @@ class Pendulum(gym.Env):
 
     def reset(self):
 
+        """
+        
+        """
+
         theta = -np.pi
         thetap = 0
 
@@ -68,5 +91,8 @@ class Pendulum(gym.Env):
 
         return observation
 
-    def render(self):
-        pass
+    # def render(self):
+    #     """
+        
+    #     """
+    #     pass
