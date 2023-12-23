@@ -7,7 +7,6 @@ RLForge environments:
 
 .. toctree::
     :maxdepth: 1
-    :titlesonly:
 
     environments/dyna_maze
     environments/shortcut_maze
