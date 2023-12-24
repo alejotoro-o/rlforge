@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlforge"
-version = "0.0.2"
+version = "0.0.3"
 authors = [
     { name="Alejandro Toro-Ossaba", email="alejotoro.o@gmail.com" },
 ]
@@ -27,4 +27,6 @@ dependencies = [
 
 [project.urls]
 "Homepage" = "https://github.com/alejotoro-o/rlforge"
+"Documentation" = "https://rlforge.readthedocs.io/"
+"Repository" = "https://github.com/alejotoro-o/rlforge"
 "Bug Tracker" = "https://github.com/alejotoro-o/rlforge/issues"
