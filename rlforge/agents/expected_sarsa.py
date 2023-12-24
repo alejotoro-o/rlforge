@@ -1,7 +1,15 @@
+"""
+
+"""
+
 from rlforge.agents.planning_agent import PlanningAgent
 import numpy as np
 
 class ExpectedSarsaAgent(PlanningAgent):
+
+    """
+    
+    """
 
     def update_q_values(self, prev_state, prev_action, reward, new_state):
         

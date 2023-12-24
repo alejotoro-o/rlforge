@@ -2,7 +2,7 @@ Policies
 ========
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     policies/epsilon_greedy
     policies/softmax

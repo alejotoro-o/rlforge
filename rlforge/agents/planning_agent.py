@@ -36,6 +36,10 @@ class PlanningAgent(BaseAgent):
     
     def step(self, reward, new_state):
 
+        """
+        
+        """
+
         action = self.select_action(self.q_values[new_state,:])
 
         self.update_q_values(self.prev_state, self.prev_action, reward, new_state)
@@ -52,6 +56,10 @@ class PlanningAgent(BaseAgent):
         return action
 
     def end(self, reward):
+        
+        """
+        
+        """
 
         self.q_values[self.prev_state, self.prev_action] += self.step_size*(reward - self.q_values[self.prev_state, self.prev_action])
 
@@ -64,9 +72,18 @@ class PlanningAgent(BaseAgent):
         return action       
     
     def update_q_values(self, prev_state, prev_action, reward, new_state):
+        
+        """
+        
+        """
         pass
 
     def update_model(self, prev_state, prev_action, reward, new_state):
+        
+        """
+        
+        """
+
         if prev_state not in self.model:
             self.model[prev_state] = {prev_action : (new_state, reward)}
             for action in self.actions:
@@ -76,6 +93,11 @@ class PlanningAgent(BaseAgent):
             self.model[prev_state][prev_action] = (new_state, reward)
 
     def planning_step(self):
+        
+        """
+        
+        """
+
         for _ in range(self.planning_steps):
             prev_state = np.random.choice(list(self.model.keys()))
             prev_action = np.random.choice(list(self.model[prev_state].keys()))

@@ -1,6 +1,5 @@
 """
-Trajectory Tracking
-===================
+
 """
 
 import gymnasium as gym

@@ -26,13 +26,9 @@ def softmax(h, temperature=1):
     The policy computes de probabilities by using the normalized softmax function.
 
     Args:
-        h [2-D Numpy array]: action preferences or action values, axis 0 are the entries/states and axis 1 are the values.
-        temperature [float]: allows adjusting the greediness (or entropy) of the policy. Smaller temperatures (below 1)
-                             decreases the entropy, and the agent selects more the greedy action; higher temperatures
-                             (above 1) increases the entropy, and the agents selects the actions more uniformly. 
+        h [2-D Numpy array]: action preferences or action values, axis 0 are the entries/states and axis 1 are the values. Temperature [float]: allows adjusting the greediness (or entropy) of the policy. Smaller temperatures (below 1) decreases the entropy, and the agent selects more the greedy action; higher temperatures (above 1) increases the entropy, and the agents selects the actions more uniformly. 
     Returns:
-        softmax_probs [2-D Numpy array]: array containing the probabilities of taking each action for each one of the 
-                                         entries/states. Axis 0 are the entries/states and axis 1 are the values.
+        softmax_probs [2-D Numpy array]: array containing the probabilities of taking each action for each one of the entries/states. Axis 0 are the entries/states and axis 1 are the values.
     """
     preferences = h/temperature
     

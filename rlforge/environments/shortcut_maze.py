@@ -1,6 +1,5 @@
 """
-Shortcut Maze
-=============
+
 """
 
 from typing import Optional

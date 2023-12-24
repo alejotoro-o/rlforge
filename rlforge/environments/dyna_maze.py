@@ -1,6 +1,5 @@
 """
-Dyna Maze
-=========
+
 """
 
 from typing import Optional

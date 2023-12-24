@@ -24,8 +24,8 @@ Welcome to rlforge's documentation!
    :hidden:
 
    tabular_agents
-   function_approximation_agents
-   actor_critic_agents
+   semi_gradient_agents
+   policy_gradient_agents
 
 .. toctree::
    :maxdepth: 1

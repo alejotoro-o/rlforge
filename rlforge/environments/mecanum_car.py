@@ -1,6 +1,5 @@
 """
-Mecanum Car
-===========
+
 """
 
 import gymnasium as gym

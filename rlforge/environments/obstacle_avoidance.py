@@ -1,6 +1,5 @@
 """
-Obstacle Avoidance
-==================
+
 """
 
 import gymnasium as gym
