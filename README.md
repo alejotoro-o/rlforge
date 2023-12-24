@@ -11,8 +11,6 @@ RL Forge is an open source reinforcement learning library that aims to provide t
 
 If you already have Python installed in your computer, you can install RLForge with:
 
-.. code-block:: console
-
     pip install rlforge
 
 This will download and install the latest stable release of ``rlforge`` available in the `Python Package Index <https://pypi.org/>`_.
@@ -25,6 +23,14 @@ The documentation, with examples, can be found in [Read the Docs](https://rlforg
 
 ## Examples
 
-- [SARSA Frozen Lake](examples/sarsa_forzenLake.ipynb)
+Multiple examples on how to use the different agents are included in the [examples folder](examples). These examples include using the library both with gymnasium environments and environments included in this package.
+
+- [SARSA - Frozen Lake](examples/sarsa_frozenLake.ipynb)
+- [Dyna Architecture - Planning Agents](examples/dynaArchitecture_planningAgents.ipynb)
 - [Tabular Methods Comparison](examples/tabularMethods_comparison.ipynb)
-- [DQN Mountain Car](examples/DQN_mountainCar.ipynb)
+- [Function Approximation with Tile Coding and Q learning - Mountain Car](examples/linearFunctionApproximation_mountainCar.ipynb)
+- [Tile Coding Q learning - Mecanum Car Environment](examples/qlearning_mecanumCar.ipynb)
+- [Tile Coding Q learning - Obstacle Avoidance Environment](examples/obstacle_avoidance.ipynb)
+- [Tile Coding Q learning - Trajectory Tracking Environment](examples/trajectory_tracking.ipynb)
+- [DQN - Mountain Car](examples/DQN_mountainCar.ipynb)
+- [Softmax and Gaussian Actor Critic - Pendulum](examples/actorCritic_pendulum.ipynb)
