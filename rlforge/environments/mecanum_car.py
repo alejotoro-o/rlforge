@@ -69,7 +69,8 @@ class MecanumCar(gym.Env):
 
         if x < self.x_range[0] or x > self.x_range[1] or y < self.y_range[0] or y > self.y_range[1]:
             reward = -100
-            is_terminal = True
+            #is_terminal = True
+            x, y, theta = prev_x, prev_y, prev_theta
 
         if ((x - self.target[0])**2 + (y - self.target[1])**2 < self.target[2]**2):
             reward = 0

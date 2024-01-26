@@ -62,7 +62,8 @@ class ObstacleAvoidance(gym.Env):
         # Out of map
         if x < self.x_range[0] or x > self.x_range[1] or y < self.y_range[0] or y > self.y_range[1]:
             reward = -1000
-            is_terminal = True
+            #is_terminal = True
+            x, y, theta = prev_x, prev_y, prev_theta
 
         # Hit obstacle
         for obstacle in self.obstacles:
