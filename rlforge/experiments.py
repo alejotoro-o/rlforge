@@ -3,7 +3,7 @@ import numpy as np
 
 def runEpisodicExperiment(env, agent, num_runs, num_episodes, max_steps_per_episode):
     """
-    
+    Episodic Experiment
     """
     rewards = np.zeros((num_episodes, num_runs))
     steps_per_episode = np.zeros((num_episodes, num_runs))

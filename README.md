@@ -7,6 +7,8 @@
 
 RL Forge is an open source reinforcement learning library that aims to provide the users with useful functions for the development of Reinforcement Learning Agents. The library also includes multiple popular reinforcement learning agents and environments, in addition, it is designed to be compatible with the gymnasium library (previous OpenAI Gym).
 
+![Lunar Lander DQN](lunarLander.gif)
+
 ## Installation
 
 If you already have Python installed in your computer, you can install RLForge with:
