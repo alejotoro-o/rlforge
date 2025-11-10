@@ -1,5 +1,5 @@
 Gaussian Actor Critic
 =====================
 
-.. automodule:: rlforge.agents.gaussian_actor_critic
+.. automodule:: rlforge.agents.policy_gradient.gaussian_actor_critic
    :members:

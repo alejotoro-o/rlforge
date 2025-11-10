@@ -8,20 +8,14 @@ Welcome to rlforge's documentation!
 
 .. toctree::
    :maxdepth: 1
-   :hidden:
+   :caption: Getting Started
 
    installation
-
-.. toctree::
-   :maxdepth: 1
-   :hidden:
-
    environments
 
 .. toctree::
    :maxdepth: 1
    :caption: Agents
-   :hidden:
 
    tabular_agents
    semi_gradient_agents
@@ -30,8 +24,13 @@ Welcome to rlforge's documentation!
 .. toctree::
    :maxdepth: 1
    :caption: Policies
-   :hidden:
 
    policies
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Utils
+
+   utils
 
 

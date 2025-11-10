@@ -1,7 +1,7 @@
 __pycache__
 .pypirc
 tests
-examples/.venv
+.venv
 dist
 rlforge.egg-info
 docs/build

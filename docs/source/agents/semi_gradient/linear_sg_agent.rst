@@ -1,5 +1,5 @@
 Tile Coding Linear Semi-gradient Q-Learning
 ===========================================
 
-.. automodule:: rlforge.agents.linear_sg_agent
+.. automodule:: rlforge.agents.semi_gradient.linear_sg_agent
    :members:

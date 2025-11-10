@@ -1,5 +1,5 @@
 SARSA Agent
 ===========
 
-.. automodule:: rlforge.agents.sarsa
+.. automodule:: rlforge.agents.tabular.sarsa
    :members: 

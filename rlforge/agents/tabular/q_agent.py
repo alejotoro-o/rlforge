@@ -2,7 +2,7 @@
 
 """
 
-from rlforge.agents.planning_agent import PlanningAgent
+from .planning_agent import PlanningAgent
 import numpy as np
 
 class QAgent(PlanningAgent):

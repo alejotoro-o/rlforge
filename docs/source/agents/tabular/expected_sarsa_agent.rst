@@ -1,6 +1,6 @@
 Expected SARSA Agent
 ====================
 
-.. automodule:: rlforge.agents.expected_sarsa
+.. automodule:: rlforge.agents.tabular.expected_sarsa
    :members:
-   :inherited-members: 
+   :inherited-members:

@@ -20,7 +20,8 @@ release = '0.0.2'
 
 extensions = [
     "sphinx_rtd_theme",
-    "sphinx.ext.autodoc"
+    "sphinx.ext.autodoc",
+    'sphinx.ext.mathjax',
 ]
 
 templates_path = ['_templates']
@@ -31,3 +32,6 @@ exclude_patterns = ['build']
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+html_sidebars = {
+    "**": ["globaltoc.html", "relations.html", "searchbox.html"]
+}

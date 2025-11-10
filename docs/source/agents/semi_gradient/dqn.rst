@@ -1,5 +1,5 @@
 Deep Q-Network (DQN)
 ====================
 
-.. automodule:: rlforge.agents.dqn
+.. automodule:: rlforge.agents.semi_gradient.dqn
    :members:

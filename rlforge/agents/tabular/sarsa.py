@@ -1,8 +1,7 @@
 """
 
 """
-
-from rlforge.agents.base_agent import BaseAgent
+from ..base_agent import BaseAgent
 import numpy as np
 from rlforge.policies import epsilonGreedy
 

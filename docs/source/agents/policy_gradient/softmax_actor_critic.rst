@@ -1,5 +1,5 @@
 Softmax Actor Critic
 ====================
 
-.. automodule:: rlforge.agents.softmax_actor_critic
+.. automodule:: rlforge.agents.policy_gradient.softmax_actor_critic
    :members:

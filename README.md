@@ -1,7 +1,10 @@
-# RLForge
+![Lunar Lander DQN](logo.svg)
+
+# RL Forge
 
 ![docs](https://readthedocs.org/projects/rlforge/badge/?version=latest)
 ![PyPI - License](https://img.shields.io/pypi/l/rlforge)
+![PyPI - Version](https://img.shields.io/pypi/v/rlforge)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/rlforge)
 ![PyPI Downloads](https://pepy.tech/badge/rlforge)
 
