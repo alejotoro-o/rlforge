@@ -1,7 +1,3 @@
-"""
-
-"""
-
 from typing import Optional
 import numpy as np
 
@@ -15,20 +11,42 @@ DOWN = 2
 LEFT = 3
 
 class DynaMaze(gym.Env):
-
     """
-    
+    Grid-world environment for testing planning-based reinforcement learning agents.
+
+    The **Dyna Maze** is a 6x9 grid with obstacles and a fixed start state.
+    The agent must navigate from the start position to the terminal goal
+    located at the top-right corner of the grid. Obstacles block certain
+    paths, forcing the agent to explore and plan effectively.
+
+    Features
+    --------
+    - Discrete state space: each cell in the grid corresponds to a unique state.
+    - Discrete action space: four possible moves (UP, RIGHT, DOWN, LEFT).
+    - Obstacles: specific grid cells are blocked and cannot be entered.
+    - Terminal state: reaching cell (0, 8) ends the episode with reward 1.
+    - All other transitions yield reward 0.
+    - Compatible with Gymnasium API.
+
+    Notes
+    -----
+    - Transition probabilities are deterministic (always 1.0).
+    - The environment is designed to illustrate the benefits of planning
+      algorithms such as Dyna-Q.
     """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, render_mode=None):
+        """
+        Initialize the Dyna Maze environment.
 
+        Parameters
+        ----------
+        render_mode : str, optional
+            Rendering mode. Supported values are ``"human"`` and ``"rgb_array"``.
         """
-        
-        """
-        
-        self.shape = (6,9)
+        self.shape = (6, 9)
         self.start_state_index = np.ravel_multi_index((2, 0), self.shape)
 
         self.nS = np.prod(self.shape)
@@ -36,10 +54,11 @@ class DynaMaze(gym.Env):
 
         # Obstacles Location
         self._obstacles = np.zeros(self.shape, dtype=bool)
-        self._obstacles[1:4,1] = True
-        self._obstacles[4,5] = True
-        self._obstacles[0:3,7] = True
+        self._obstacles[1:4, 1] = True
+        self._obstacles[4, 5] = True
+        self._obstacles[0:3, 7] = True
 
+        # Transition probabilities
         self.P = {}
         for s in range(self.nS):
             position = np.unravel_index(s, self.shape)
@@ -49,8 +68,7 @@ class DynaMaze(gym.Env):
             self.P[s][DOWN] = self._calculate_transition_prob(position, [1, 0])
             self.P[s][LEFT] = self._calculate_transition_prob(position, [0, -1])
 
-        # Calculate initial state distribution
-        # We always start in state (2, 0)
+        # Initial state distribution (always start at (2, 0))
         self.initial_state_distrib = np.zeros(self.nS)
         self.initial_state_distrib[self.start_state_index] = 1.0
 
@@ -60,12 +78,19 @@ class DynaMaze(gym.Env):
         self.render_mode = render_mode
 
     def _limit_coordinates(self, coord: np.ndarray) -> np.ndarray:
-
         """
-        
-        """
+        Clamp coordinates to remain inside the grid boundaries.
 
-        """Prevent the agent from falling out of the grid world."""
+        Parameters
+        ----------
+        coord : numpy.ndarray
+            Candidate coordinates (row, col).
+
+        Returns
+        -------
+        numpy.ndarray
+            Valid coordinates within the grid.
+        """
         coord[0] = min(coord[0], self.shape[0] - 1)
         coord[0] = max(coord[0], 0)
         coord[1] = min(coord[1], self.shape[1] - 1)
@@ -74,12 +99,27 @@ class DynaMaze(gym.Env):
 
     def _calculate_transition_prob(self, current_position, delta):
         """
-        Determine the outcome for an action. Transition Prob is always 1.0.
-        Args:
-            current: Current position on the grid as (row, col)
-            delta: Change in position for transition
-        Returns:
-            Tuple of ``(1.0, new_state, reward, terminated)``
+        Compute the transition outcome for a given action.
+
+        Parameters
+        ----------
+        current_position : tuple(int, int)
+            Current grid position (row, col).
+        delta : list(int, int)
+            Change in position for the action.
+
+        Returns
+        -------
+        list of tuple
+            A list containing a single tuple ``(1.0, new_state, reward, terminated)``.
+
+        Notes
+        -----
+        - If the new position is an obstacle, the agent remains in the same state
+          with reward 0.
+        - If the new position is the terminal state (0, 8), the agent receives
+          reward 1 and the episode terminates.
+        - Otherwise, the agent moves to the new state with reward 0.
         """
         new_position = np.array(current_position) + np.array(delta)
         new_position = self._limit_coordinates(new_position).astype(int)
@@ -96,11 +136,27 @@ class DynaMaze(gym.Env):
         return [(1.0, new_state, 0, False)]
 
     def step(self, a):
-
         """
-        
-        """
+        Execute one step in the environment.
 
+        Parameters
+        ----------
+        a : int
+            Action index (0=UP, 1=RIGHT, 2=DOWN, 3=LEFT).
+
+        Returns
+        -------
+        observation : int
+            The new state index.
+        reward : float
+            Reward obtained from the transition.
+        terminated : bool
+            Whether the episode has ended.
+        truncated : bool
+            Always False (no time limit).
+        info : dict
+            Additional information, including transition probability.
+        """
         transitions = self.P[self.s][a]
         i = categorical_sample([t[0] for t in transitions], self.np_random)
         p, s, r, t = transitions[i]
@@ -110,14 +166,26 @@ class DynaMaze(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        return (int(s), r, t, False, {"prob": p})
+        return int(s), r, t, False, {"prob": p}
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+        """
+        Reset the environment to its initial state.
 
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed for reproducibility.
+        options : dict, optional
+            Additional options (unused).
+
+        Returns
+        -------
+        observation : int
+            The starting state index.
+        info : dict
+            Additional information, including probability of starting state.
         """
-        
-        """
-        
         super().reset(seed=seed)
         self.s = categorical_sample(self.initial_state_distrib, self.np_random)
         self.lastaction = None
@@ -125,6 +193,3 @@ class DynaMaze(gym.Env):
         if self.render_mode == "human":
             self.render()
         return int(self.s), {"prob": 1}
-
-    # def render(self):
-    #     pass

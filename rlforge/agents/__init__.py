@@ -1,1 +1,4 @@
-from rlforge.agents.base_agent import BaseAgent
+from .base_agent import BaseAgent
+from .bandit import BanditAgent
+
+__all__ = ["BaseAgent", "BanditAgent"]
