@@ -36,9 +36,10 @@ def softmax(h, temperature=1):
 
     The softmax policy assigns probabilities to actions based on their
     preferences or values. The `temperature` parameter controls the
-    exploration–exploitation trade-off:
-      - Low temperature (< 1): more greedy, favors high-value actions.
-      - High temperature (> 1): more exploratory, probabilities spread more evenly.
+    exploration-exploitation trade-off:
+    
+        - Low temperature (< 1): more greedy, favors high-value actions.
+        - High temperature (> 1): more exploratory, probabilities spread more evenly.
 
     Parameters
     ----------

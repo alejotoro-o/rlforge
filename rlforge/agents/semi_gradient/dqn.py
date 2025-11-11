@@ -1,7 +1,3 @@
-"""
-
-"""
-
 import numpy as np
 from copy import deepcopy
 
@@ -9,10 +5,52 @@ from rlforge.policies import softmax
 from rlforge.agents import BaseAgent
 from rlforge.function_approximation import MLP
 from rlforge.utils import ExperienceBuffer
-from rlforge.optimizers import AdamOptimizer
 
 class DQNAgent(BaseAgent):
+    """
+    Deep Q-Network (DQN) Agent implemented with raw function approximation.
 
+    This agent uses a hand-rolled multilayer perceptron (MLP) for Q-value
+    estimation, an experience replay buffer, and a target network for
+    stabilizing training. It follows the canonical DQN design but avoids
+    external deep learning frameworks for clarity and speed in small-scale
+    experiments.
+
+    Parameters
+    ----------
+    learning_rate : float
+        Step size for weight updates in the MLP.
+    discount : float
+        Discount factor (gamma) for future rewards.
+    state_dim : int
+        Dimension of the environment's state space.
+    num_actions : int
+        Number of discrete actions available in the environment.
+    temperature : float, optional (default=1)
+        Temperature parameter for softmax action selection.
+    network_architecture : list of int, optional (default=[2])
+        Hidden layer sizes for the MLP.
+    target_network_update_steps : int, optional (default=8)
+        Frequency (in training steps) to copy weights from the main network
+        to the target network.
+    num_replay : int, optional (default=0)
+        Number of replay updates per environment step.
+    experience_buffer_size : int, optional (default=1024)
+        Maximum size of the replay buffer.
+    mini_batch_size : int, optional (default=8)
+        Number of samples per replay update.
+
+    Attributes
+    ----------
+    main_network : MLP
+        The primary Q-value estimator.
+    target_network : MLP
+        A periodically updated copy of the main network for stable targets.
+    experience_buffer : ExperienceBuffer
+        Stores transitions for replay updates.
+    elapsed_training_steps : int
+        Counter for steps since last target network update.
+    """
     def __init__(self, learning_rate, discount, state_dim, num_actions, temperature=1, 
                  network_architecture=[2], target_network_update_steps=8,
                  num_replay=0, experience_buffer_size=1024, mini_batch_size=8):
@@ -38,7 +76,19 @@ class DQNAgent(BaseAgent):
         self.experience_buffer = ExperienceBuffer(self.experience_buffer_size, self.mini_batch_size)
 
     def start(self, new_state):
+        """
+        Begin an episode by selecting an action from the initial state.
 
+        Parameters
+        ----------
+        new_state : np.ndarray
+            The initial environment state.
+
+        Returns
+        -------
+        action : int
+            The selected action.
+        """
         q_values, _ = self.main_network.forward_propagation(new_state)
         action = self.select_action(q_values, self.temperature)
 
@@ -48,7 +98,21 @@ class DQNAgent(BaseAgent):
         return action
     
     def step(self, reward, new_state):
+        """
+        Take a step in the environment, update replay buffer, and train.
 
+        Parameters
+        ----------
+        reward : float
+            Reward received from the previous action.
+        new_state : np.ndarray
+            The new environment state.
+
+        Returns
+        -------
+        action : int
+            The next action chosen by the agent.
+        """
         q_values, _ = self.main_network.forward_propagation(new_state)
         action = self.select_action(q_values, self.temperature)
         
@@ -76,7 +140,14 @@ class DQNAgent(BaseAgent):
         return action
     
     def end(self, reward):
-    
+        """
+        Handle the terminal transition at the end of an episode.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received before termination.
+        """
         new_state = np.zeros_like(self.prev_state)
 
         self.experience_buffer.append(self.prev_state, self.prev_action, reward, 1, new_state)
@@ -92,14 +163,42 @@ class DQNAgent(BaseAgent):
                 self.main_network.update_weights(grads)
 
     def select_action(self, q_values, temperature):
-        
+        """
+        Select an action using softmax exploration.
+
+        Parameters
+        ----------
+        q_values : np.ndarray
+            Q-values for the current state.
+        temperature : float
+            Softmax temperature.
+
+        Returns
+        -------
+        action : int
+            Selected action index.
+        """
         softmax_probs = softmax(q_values, temperature)
         action = np.random.choice(self.num_actions, p=softmax_probs)
 
         return action
     
     def get_td_error(self, experiences):
+        """
+        Compute temporal-difference (TD) error for a batch of experiences.
 
+        Parameters
+        ----------
+        experiences : list of tuples
+            Each tuple contains (state, action, reward, terminal, next_state).
+
+        Returns
+        -------
+        td_error_mat : np.ndarray
+            Matrix of TD errors aligned with actions.
+        cache : dict
+            Cached forward pass values for backpropagation.
+        """
         states, actions, rewards, terminal, new_states = map(list, zip(*experiences))
         states = np.vstack(states)
         actions = np.vstack(actions).squeeze()
@@ -121,7 +220,9 @@ class DQNAgent(BaseAgent):
         return td_error_mat, cache
     
     def reset(self):
-
+        """
+        Reset the agent's networks and replay buffer for a fresh run.
+        """
         self.main_network = MLP(input_dim=self.state_dim,
                                 output_dim=self.num_actions,
                                 hidden_layers=self.network_architecture,

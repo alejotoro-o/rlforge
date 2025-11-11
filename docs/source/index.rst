@@ -12,11 +12,14 @@ Welcome to rlforge's documentation!
 
    installation
    environments
+   examples
 
 .. toctree::
    :maxdepth: 1
    :caption: Agents
 
+   agents/base_agent
+   agents/bandit_agent
    tabular_agents
    semi_gradient_agents
    policy_gradient_agents

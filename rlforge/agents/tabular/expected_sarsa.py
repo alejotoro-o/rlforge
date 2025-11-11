@@ -39,19 +39,22 @@ class ExpectedSarsaAgent(PlanningAgent):
 
         Notes
         -----
-        - The probability distribution `pi` is constructed such that:
-          * Each non-greedy action has probability `epsilon / num_actions`.
-          * Greedy actions (those with maximum Q-value) share the remaining
-            probability mass `(1 - epsilon)`.
+        - The probability distribution `pi` is constructed such that:      
+            * Each non-greedy action has probability `epsilon / num_actions`.
+            * Greedy actions (those with maximum Q-value) share the remaining 
+              probability mass `(1 - epsilon)`.
+            
         - The Q-value update follows:
 
             .. math::
+                
                 Q(s, a) \leftarrow Q(s, a) +
                 \alpha \Big[ r + \gamma \sum_{a'} \pi(a' \mid s') Q(s', a') - Q(s, a) \Big]
 
 
             where :math:`\alpha` is the step size, :math:`\gamma` is the discount
             factor, and :math:`\pi(a' \mid s')` is the epsilon-greedy policy.
+
         """
         q_max = np.max(self.q_values[new_state,:])
 

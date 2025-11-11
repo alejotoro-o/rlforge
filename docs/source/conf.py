@@ -22,10 +22,14 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
     'sphinx.ext.mathjax',
+    "nbsphinx",
+    "nbsphinx_link",
 ]
 
 templates_path = ['_templates']
 exclude_patterns = ['build']
+suppress_warnings = ['config.cache']
+nbsphinx_execute = 'never'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

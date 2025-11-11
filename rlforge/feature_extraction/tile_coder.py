@@ -1,5 +1,5 @@
 import numpy as np
-import tiles3
+from rlforge.feature_extraction import tiles3
 
 class TileCoder:
     """

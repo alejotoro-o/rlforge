@@ -42,14 +42,14 @@ class QAgent(PlanningAgent):
         -----
         - The Q-value update follows:
 
-          .. math::
+            .. math::
 
-             Q(s, a) \leftarrow Q(s, a) +
-             \alpha \Big[ r + \gamma \max_{a'} Q(s', a') - Q(s, a) \Big]
+                Q(s, a) \leftarrow Q(s, a) +
+                \alpha \Big[ r + \gamma \max_{a'} Q(s', a') - Q(s, a) \Big]
 
-          where :math:`\alpha` is the step size, :math:`\gamma` is the discount
-          factor, and :math:`\max_{a'} Q(s', a')` is the maximum action value
-          in the next state.
+            where :math:`\alpha` is the step size, :math:`\gamma` is the discount
+            factor, and :math:`\max_{a'} Q(s', a')` is the maximum action value
+            in the next state.
         """
         self.q_values[prev_state, prev_action] += self.step_size * (
             reward + self.discount * np.max(self.q_values[new_state,:])
