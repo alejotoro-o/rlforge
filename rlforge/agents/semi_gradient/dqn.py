@@ -12,9 +12,7 @@ class DQNAgent(BaseAgent):
 
     This agent uses a hand-rolled multilayer perceptron (MLP) for Q-value
     estimation, an experience replay buffer, and a target network for
-    stabilizing training. It follows the canonical DQN design but avoids
-    external deep learning frameworks for clarity and speed in small-scale
-    experiments.
+    stabilizing training.
 
     Parameters
     ----------

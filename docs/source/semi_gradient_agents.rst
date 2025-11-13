@@ -19,6 +19,8 @@ RLForge currently includes:
 - **Deep Q-Network (DQN)** — leverages deep neural networks to approximate
   action-value functions, enabling agents to handle high-dimensional inputs
   such as images or complex environments.
+- **Deep Q-Network (DQN) PyTorch** — implements de DQN agent using PyTorch, this agent
+  allows to define any PyTorch model as its network.
 
 These agents demonstrate how function approximation techniques can scale
 reinforcement learning beyond simple tabular domains, forming the foundation
@@ -29,3 +31,4 @@ for modern RL applications.
 
     agents/semi_gradient/linear_sg_agent
     agents/semi_gradient/dqn
+    agents/semi_gradient/dqn_pytorch

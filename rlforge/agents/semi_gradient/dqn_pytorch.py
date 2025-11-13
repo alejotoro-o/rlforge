@@ -39,6 +39,19 @@ class DQNTorchAgent(BaseAgent):
         Number of samples per replay update.
     device : str, optional (default="cpu")
         Device to run the model on ("cpu" or "cuda").
+
+    Attributes
+    ----------
+    main_network : torch.nn.Module
+        The primary Q-value estimator.
+    target_network : torch.nn.Module
+        A periodically updated copy of the main network for stable targets.
+    optimizer : torch.optim.Optimizer
+        Optimizer used for training the main network.
+    experience_buffer : ExperienceBuffer
+        Stores transitions for replay updates.
+    elapsed_training_steps : int
+        Counter for steps since last target network update.
     """
 
     def __init__(self, model, learning_rate, discount, num_actions,
@@ -69,6 +82,19 @@ class DQNTorchAgent(BaseAgent):
         self.elapsed_training_steps = 0
 
     def start(self, new_state):
+        """
+        Begin an episode by selecting an action from the initial state.
+
+        Parameters
+        ----------
+        new_state : np.ndarray
+            The initial environment state.
+
+        Returns
+        -------
+        action : int
+            The selected action index.
+        """
         state_tensor = torch.tensor(new_state, dtype=torch.float32).unsqueeze(0).to(self.device)
         q_values = self.main_network(state_tensor).detach().cpu().numpy()
         action = self.select_action(q_values, self.temperature)
@@ -78,6 +104,21 @@ class DQNTorchAgent(BaseAgent):
         return action
 
     def step(self, reward, new_state):
+        """
+        Take a step in the environment, update replay buffer, and train.
+
+        Parameters
+        ----------
+        reward : float
+            Reward received from the previous action.
+        new_state : np.ndarray
+            The new environment state.
+
+        Returns
+        -------
+        action : int
+            The next action chosen by the agent.
+        """
         state_tensor = torch.tensor(new_state, dtype=torch.float32).unsqueeze(0).to(self.device)
         q_values = self.main_network(state_tensor).detach().cpu().numpy()
         action = self.select_action(q_values, self.temperature)
@@ -98,6 +139,14 @@ class DQNTorchAgent(BaseAgent):
         return action
 
     def end(self, reward):
+        """
+        Handle the terminal transition at the end of an episode.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received before termination.
+        """
         new_state = np.zeros_like(self.prev_state)
         self.experience_buffer.append(self.prev_state, self.prev_action, reward, 1, new_state)
 
@@ -106,11 +155,32 @@ class DQNTorchAgent(BaseAgent):
                 self._train_step()
 
     def select_action(self, q_values, temperature):
+        """
+        Select an action using softmax exploration.
+
+        Parameters
+        ----------
+        q_values : np.ndarray
+            Q-values for the current state.
+        temperature : float
+            Softmax temperature.
+
+        Returns
+        -------
+        action : int
+            Selected action index.
+        """
         softmax_probs = softmax(q_values, temperature)
         action = np.random.choice(self.num_actions, p=softmax_probs)
         return action
 
     def _train_step(self):
+        """
+        Perform a single training step using a mini-batch from the replay buffer.
+
+        This computes the TD target, evaluates the loss, and updates the
+        parameters of the main network via backpropagation.
+        """
         states, actions, rewards, terminal, new_states = map(list, zip(*self.experience_buffer.sample()))
 
         states = torch.tensor(np.vstack(states), dtype=torch.float32).to(self.device)
@@ -136,6 +206,12 @@ class DQNTorchAgent(BaseAgent):
         self.optimizer.step()
 
     def reset(self):
+        """
+        Reset the agent's target network and replay buffer for a fresh run.
+
+        This restores the target network to match the main network and clears
+        the replay buffer.
+        """
         self.target_network.load_state_dict(self.main_network.state_dict())
         self.experience_buffer = ExperienceBuffer(self.experience_buffer.size, self.mini_batch_size)
         self.elapsed_training_steps = 0
