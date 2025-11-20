@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
+from ..base_agent import BaseAgent
 
-# If you have a BaseAgent in rlforge, you can inherit; otherwise remove it.
-class PPODiscrete:  # (BaseAgent)
+class PPODiscrete(BaseAgent):
     """
     Minimal PPO for discrete action spaces (no GAE).
     - Separate actor/critic LRs

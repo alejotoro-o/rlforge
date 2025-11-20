@@ -5,7 +5,8 @@ from .mecanum_car import MecanumCar
 from .obstacle_avoidance import ObstacleAvoidance
 from .trajectory_tracking import TrajectoryTracking
 from .bandits import Bandits
+from .pid import PIDStatic
 
-__all__ = ["DynaMaze", "ShortcutMaze", "Pendulum", "MecanumCar", "ObstacleAvoidance", "TrajectoryTracking", "Bandits"]
+__all__ = ["DynaMaze", "ShortcutMaze", "Pendulum", "MecanumCar", "ObstacleAvoidance", "TrajectoryTracking", "Bandits", "PIDStatic"]
 
 
