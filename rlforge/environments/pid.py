@@ -2,11 +2,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-class PIDStatic(gym.Env):
-    """
-    The agent supplies PID gains ONLY ONCE (the first action). 
-    Later actions are ignored, enforcing a single-run test of static gains.
-    """
+class PID(gym.Env):
+
     def __init__(self, m=1.0, k=1.0, b=1.0, w=1, dt=0.01, episode_len=100):
         super().__init__()
         # Kp, Ki, Kd action space
