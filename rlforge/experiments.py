@@ -21,18 +21,9 @@ class ExperimentRunner:
         """
         if window_size <= 1:
             return data
-        # Handle NaN values correctly for the moving average calculation
-        weights = np.ones(window_size)
-        weights_sum = np.sum(weights)
         
-        # Convolve data (treating NaN as 0 temporarily) and weights
-        data_nan_to_zero = np.nan_to_num(data)
-        smoothed_data = np.convolve(data_nan_to_zero, weights, 'valid') / weights_sum
-        
-        # Pad the start with NaNs so the length matches the original data length
-        # This keeps the x-axis alignment correct for plotting.
-        padding = np.full(window_size - 1, np.nan)
-        return np.concatenate((padding, smoothed_data))
+        weights = np.ones(window_size) / window_size
+        return np.convolve(data, weights, mode='full')[:len(data)]
 
     def run_episodic(self, num_runs, num_episodes, max_steps_per_episode=None):
         """Runs the experiment for a single environment in an episodic setting."""
@@ -224,18 +215,6 @@ class ExperimentRunner:
                         rewards_list.append(total_rewards_tracker[i])
                         steps_list.append(episode_steps_tracker[i])
 
-                        # -----------------------------------------------------------------
-                        # FIX: Call the 'end_batch' hook per environment (i) on termination.
-                        # We pass a single-element array containing the final reward for 
-                        # environment i, adhering to the end_batch(rewards) signature.
-                        if hasattr(self.agent, 'end_batch'):
-                            # NOTE: This assumes the agent is robust enough to process a batch 
-                            # of size 1 and correctly determine which trajectory (index) 
-                            # completed internally.
-                            self.agent.end_batch(rewards=np.array([rewards[i]])) 
-                        # -----------------------------------------------------------------
-
-
                         # B. Check Quota and Break Cleanly (CRITICAL: Break before reset)
                         episodes_completed_in_run += 1
                         pbar.update(1)
@@ -257,14 +236,17 @@ class ExperimentRunner:
                 if episodes_completed_in_run >= num_episodes:
                     # Need to break the main while loop as well
                     break 
+
+            if hasattr(self.agent, 'end_batch'):
+                self.agent.end_batch(rewards) 
             
             pbar.close()
 
             # Final 'end_batch' call for ON-POLICY agents (PPO) only
             # This handles a partial, non-terminal rollout buffer at the end of the *run*.
             # Here, we pass the full N rewards array.
-            if hasattr(self.agent, 'step_count') and self.agent.step_count > 0:
-                self.agent.end_batch(total_rewards_tracker)
+            # if hasattr(self.agent, 'step_count') and self.agent.step_count > 0:
+            #     self.agent.end_batch(total_rewards_tracker)
                 
             runtime_per_run.append(time.time() - run_start)
             trajectories.append(run_trajectories)
@@ -291,8 +273,8 @@ class ExperimentRunner:
             "steps": steps_per_episode, 
             "trajectories": trajectories, 
             "runtime_per_run": runtime_per_run,
-            "mean_rewards": np.nanmean(rewards, axis=1),
-            "mean_steps": np.nanmean(steps_per_episode, axis=1),
+            "mean_rewards": np.mean(rewards, axis=1),
+            "mean_steps": np.mean(steps_per_episode, axis=1),
         }
         return self.results
 
@@ -347,9 +329,13 @@ class ExperimentRunner:
         """
         Generates a smoothed plot of the experiment results (mean and STD across runs).
 
+        CRITICAL FIX: Standard Deviation is NOT smoothed, only the mean is smoothed.
+        The instantaneous STD across runs is used for the error band to accurately 
+        reflect the variability at each time step.
+
         Args:
             metric (str): 'reward' or 'step' (for episodic experiments).
-            window_size (int): The size of the moving average window for smoothing.
+            window_size (int): The size of the moving average window for smoothing the MEAN.
         """
         if not self.results:
             print("No results available. Run an experiment first.")
@@ -371,41 +357,44 @@ class ExperimentRunner:
             print(f"Error: Could not retrieve valid 2D data for metric '{metric}'.")
             return
 
-        # 1. Calculate Mean and STD across runs at each time step (episode/step)
+        # 1. Calculate Mean and STD across runs (axis=1) at each time step (episode/step)
         # Use nanmean/nanstd as the arrays may be padded with np.nan if episode lengths differ
-        runs_mean = np.nanmean(data, axis=1) # (episodes,)
-        runs_std = np.nanstd(data, axis=1)   # (episodes,)
+        runs_mean = np.nanmean(data, axis=1) # (episodes,) - Raw mean at time t
+        runs_std = np.nanstd(data, axis=1)   # (episodes,) - Raw STD at time t
 
-        # 2. Smooth the Mean and STD using the internal helper
+        # 2. Smooth ONLY the Mean using the internal helper
         smoothed_mean = self._moving_average(runs_mean, window_size)
-        smoothed_std = self._moving_average(runs_std, window_size)
+        
+        # 3. Use the raw, instantaneous standard deviation for the error band.
+        raw_std = runs_std 
 
-        # The MA function returns an array of the same length, padded with NaNs at the start.
+        # 4. Prepare for plotting (filter out initial NaN padding)
         n_points = len(smoothed_mean)
         x_axis = np.arange(n_points)
 
-        # 3. Calculate the Bounds for the filled area
-        # We need to filter out the initial NaN padding before plotting.
         valid_indices = ~np.isnan(smoothed_mean)
         
         plot_x = x_axis[valid_indices]
         plot_mean = smoothed_mean[valid_indices]
-        plot_std = smoothed_std[valid_indices]
+        
+        # IMPORTANT: The raw STD must be aligned with the smoothed mean indices.
+        plot_std = raw_std[valid_indices]
 
-        # Calculate bounds on the valid points
+        # 5. Calculate the Bounds for the filled area (no arbitrary capping)
+        # Note: The raw STD is now correctly aligned and not artificially inflated by smoothing.
         lower_bound = plot_mean - plot_std
         upper_bound = plot_mean + plot_std
 
-        # 4. Plotting
+        # 6. Plotting
         plt.figure(figsize=(10, 6))
         
         # Plot the smoothed mean line
         plt.plot(plot_x, plot_mean, label=f'Smoothed Mean (Window={window_size})', linewidth=2)
         
-        # Fill the area for the smoothed standard deviation (mean ± std)
+        # Fill the area for the instantaneous standard deviation (mean ± std)
         plt.fill_between(plot_x, lower_bound, upper_bound, alpha=0.3, label=f'Mean ± STD')
         
-        plt.title(f"{title} (Smoothed over {window_size} points)", fontsize=16)
+        plt.title(f"{title} (Mean Smoothed over {window_size} points)", fontsize=16)
         plt.xlabel(f'{self.results.get("type").capitalize()} Index', fontsize=12)
         plt.ylabel(ylabel, fontsize=12)
         plt.grid(True, linestyle='--', alpha=0.6)

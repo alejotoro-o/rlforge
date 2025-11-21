@@ -62,7 +62,7 @@ class DDPGAgent(BaseAgent):
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Initialize all networks and optimizers by calling the internal reset
-        self.reset_nets_and_opts(init_weights=True)
+        self.reset_nets_and_opts()
 
         # --- Off-Policy Replay Buffer ---
         self.replay_buffer = deque(maxlen=buffer_size)
@@ -328,7 +328,7 @@ class DDPGAgent(BaseAgent):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
 
-    def reset_nets_and_opts(self, init_weights=False):
+    def reset_nets_and_opts(self):
         """
         Internal function to build/rebuild all networks and optimizers.
         """

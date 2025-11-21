@@ -15,7 +15,8 @@ class PPODiscrete(BaseAgent):
     - Clipped objective
     """
 
-    def __init__(self, state_dim, 
+    def __init__(self, 
+                 state_dim, 
                  num_actions,
                  actor_lr=3e-4, 
                  critic_lr=3e-4, 

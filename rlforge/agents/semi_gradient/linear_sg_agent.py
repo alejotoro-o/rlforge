@@ -1,7 +1,3 @@
-"""
-
-"""
-
 import numpy as np
 
 from rlforge.policies import epsilonGreedy
