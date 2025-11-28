@@ -8,11 +8,51 @@ import copy
 
 class PPOContinuous(BaseAgent):
     """
-    PPO for continuous action spaces with GAE(λ), adapted for vectorized (N) environments.
-    Data is collected in (T, N, ...) format and flattened to (T*N, ...) for training.
-    
-    The networks are now built internally using the provided architecture to ensure 
-    proper re-initialization during reset().
+    Proximal Policy Optimization (PPO) Agent for continuous action spaces.
+
+    This agent implements PPO with Generalized Advantage Estimation (GAE),
+    adapted for vectorized environments. Data is collected in (T, N, ...)
+    format and flattened to (T*N, ...) for training. Networks are built
+    internally to ensure proper re-initialization during reset.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimension of the input state space.
+    action_dim : int
+        Dimension of the continuous action space.
+    network_architecture : list of int, optional
+        Sizes of hidden layers for both actor and critic networks (default=[64, 64]).
+    actor_lr : float, optional
+        Learning rate for the actor/policy network (default=3e-4).
+    critic_lr : float, optional
+        Learning rate for the critic/value network (default=3e-4).
+    discount : float, optional
+        Discount factor γ applied to future rewards (default=0.99).
+    gae_lambda : float, optional
+        GAE parameter λ controlling bias-variance tradeoff (default=0.95).
+    clip_epsilon : float, optional
+        Clipping parameter for PPO objective (default=0.2).
+    update_epochs : int, optional
+        Number of epochs per PPO update (default=10).
+    mini_batch_size : int, optional
+        Size of mini-batches sampled during PPO updates (default=64).
+    rollout_length : int, optional
+        Number of transitions per environment before an update (default=2048).
+    value_coef : float, optional
+        Coefficient for value loss in PPO objective (default=0.5).
+    entropy_coeff : float, optional
+        Coefficient for entropy bonus in PPO objective (default=0.0).
+    max_grad_norm : float, optional
+        Maximum gradient norm for clipping (default=0.5).
+    tanh_squash : bool, optional
+        Whether to apply tanh squashing to actions (default=False).
+    action_low : float or np.ndarray, optional
+        Lower bound(s) for continuous actions.
+    action_high : float or np.ndarray, optional
+        Upper bound(s) for continuous actions.
+    device : str or torch.device, optional
+        Device to run computations on ("cpu" or "cuda"). Defaults to CUDA if available.
     """
 
     def __init__(self,
@@ -88,9 +128,24 @@ class PPOContinuous(BaseAgent):
 
     def _create_network(self, input_dim, output_dim):
         """
-        Helper function to build a standard MLP (Sequential) for either policy or value.
-        This handles the network construction internally, supporting the reset logic.
+        Build a standard feedforward MLP network.
+
+        Constructs a sequential model with Tanh activations in hidden layers.
+        Used for both policy and value networks.
+
+        Parameters
+        ----------
+        input_dim : int
+            Dimension of the input features.
+        output_dim : int
+            Dimension of the output (e.g., action_dim or 1 for value).
+
+        Returns
+        -------
+        nn.Sequential
+            The constructed PyTorch network.
         """
+
         layers = []
         current_dim = input_dim
         
@@ -110,6 +165,13 @@ class PPOContinuous(BaseAgent):
 
 
     def _weights_init(self, m):
+        """
+        Initialize weights for linear layers.
+
+        Uses Kaiming uniform initialization for weights and sets biases to zero.
+        Suitable for Tanh/ReLU activations.
+        """
+
         if isinstance(m, nn.Linear):
             # Kaiming uniform initialization is standard for Tanh/ReLU layers
             nn.init.kaiming_uniform_(m.weight.data, nonlinearity='tanh') 
@@ -119,9 +181,37 @@ class PPOContinuous(BaseAgent):
 
 
     def _to_tensor(self, x):
+        """
+        Convert input to a float32 tensor on the agent's device.
+
+        Parameters
+        ----------
+        x : array-like or scalar
+            Input data.
+
+        Returns
+        -------
+        torch.Tensor
+            Float tensor on the agent's device.
+        """
+
         return torch.as_tensor(x, dtype=torch.float32, device=self.device)
 
     def _dist_from_mean(self, mean):
+        """
+        Construct a Normal distribution from the policy mean.
+
+        Parameters
+        ----------
+        mean : torch.Tensor, shape (B, action_dim)
+            Mean action values from the policy network.
+
+        Returns
+        -------
+        torch.distributions.Independent
+            Multivariate Normal distribution with diagonal covariance.
+        """
+
         # mean: (B, action_dim)
         std = torch.exp(self.log_std)           # (action_dim,)
         std = std.expand_as(mean)               # (B, action_dim)
@@ -130,6 +220,26 @@ class PPOContinuous(BaseAgent):
 
 
     def _sample_action(self, mean):
+        """
+        Sample an action from the policy distribution.
+
+        Uses a Normal distribution with learned log standard deviation.
+        Supports reparameterization and optional tanh squashing with
+        log-prob correction.
+
+        Parameters
+        ----------
+        mean : torch.Tensor
+            Policy network output (mean action).
+
+        Returns
+        -------
+        tuple
+            (action, log_prob) where:
+            - action : torch.Tensor, final action after squashing/rescaling
+            - log_prob : torch.Tensor, log probability of the sampled action
+        """
+
         # Unsquashed Normal
         std = torch.exp(self.log_std).expand_as(mean)
         base = Normal(mean, std)
@@ -156,12 +266,46 @@ class PPOContinuous(BaseAgent):
         return action, log_prob
 
 
-    # --- Single-env methods (wrap batch versions) ---
     def start(self, state):
+        """
+        Begin a new episode in a single environment.
+
+        Parameters
+        ----------
+        state : array-like
+            Initial state of the environment.
+
+        Returns
+        -------
+        np.ndarray
+            Selected action.
+        """
+
         actions = self.start_batch(np.expand_dims(state, axis=0))
         return actions[0]
 
     def step(self, reward, state, done=False):
+        """
+        Take a step in a single environment.
+
+        Stores transition, performs updates if conditions are met,
+        and selects the next action.
+
+        Parameters
+        ----------
+        reward : float
+            Reward from the previous action.
+        state : array-like
+            Next state observed.
+        done : bool, optional
+            Whether the episode has terminated (default=False).
+
+        Returns
+        -------
+        np.ndarray
+            Selected action.
+        """
+
         actions = self.step_batch(
             np.array([reward], dtype=np.float32),
             np.expand_dims(state, axis=0),
@@ -170,11 +314,35 @@ class PPOContinuous(BaseAgent):
         return actions[0]
 
     def end(self, reward):
+        """
+        Complete an episode in a single environment.
+
+        Stores the final transition into the rollout buffer.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received at the end of the episode.
+        """
+
         self.end_batch(np.array([reward], dtype=np.float32))
 
 
-    # --- Batch versions (true implementation) ---
     def start_batch(self, states):
+        """
+        Begin a new episode with multiple environments.
+
+        Parameters
+        ----------
+        states : array-like, shape (N, state_dim)
+            Batch of initial states.
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N, action_dim).
+        """
+
         S = self._to_tensor(states)
         self.policy_net.eval()
         self.value_net.eval()
@@ -192,6 +360,27 @@ class PPOContinuous(BaseAgent):
 
 
     def step_batch(self, rewards, states, dones):
+        """
+        Take a step in multiple environments.
+
+        Stores transitions in the rollout buffer, performs PPO updates if
+        conditions are met, and selects next actions.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Rewards from the previous actions.
+        states : array-like, shape (N, state_dim)
+            Next states observed.
+        dones : array-like, shape (N,)
+            Boolean flags indicating episode termination.
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N, action_dim).
+        """
+
         # Store transition (S_t, A_t, R_t, V_t, done_t) from last step/start
         self.rollout_buffer['states'].append(self.prev_state)
         self.rollout_buffer['actions'].append(self.prev_action)
@@ -226,6 +415,18 @@ class PPOContinuous(BaseAgent):
 
 
     def end_batch(self, rewards):
+        """
+        Complete episodes for multiple environments.
+
+        Stores terminal transitions into the rollout buffer and performs PPO
+        updates if conditions are met.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Final rewards received for each terminated environment.
+        """
+
         N = len(rewards)
         
         # Store final transition (S_t, A_t, R_t, V_t, done_t=True)
@@ -244,6 +445,27 @@ class PPOContinuous(BaseAgent):
             self.step_count = 0
 
     def _compute_returns_and_advantages(self, rewards, dones, values, last_value):
+        """
+        Compute returns and GAE advantages.
+
+        Parameters
+        ----------
+        rewards : torch.Tensor, shape (T, N)
+            Rewards collected during rollout.
+        dones : torch.Tensor, shape (T, N)
+            Boolean flags indicating episode termination.
+        values : torch.Tensor, shape (T, N)
+            Value function estimates for each state.
+        last_value : torch.Tensor, shape (N,)
+            Value estimate for the final state or zero if terminal.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            returns : (T, N) tensor of discounted returns
+            advantages : (T, N) tensor of GAE advantages
+        """
+
         T, N = rewards.shape
         advantages = torch.zeros_like(values)
         returns = torch.zeros_like(values)
@@ -261,6 +483,26 @@ class PPOContinuous(BaseAgent):
         return returns, advantages
     
     def _log_prob_actions(self, mean, actions):
+        """
+        Compute log probabilities of given actions under the current policy.
+
+        Handles both standard Gaussian actions and tanh-squashed actions with
+        affine rescaling to environment bounds. Includes correction terms for
+        tanh squashing.
+
+        Parameters
+        ----------
+        mean : torch.Tensor, shape (B, action_dim)
+            Mean action values from the policy network.
+        actions : torch.Tensor, shape (B, action_dim)
+            Actions taken during rollout.
+
+        Returns
+        -------
+        torch.Tensor, shape (B,)
+            Log probabilities of the given actions under the current policy.
+        """
+
         std = torch.exp(self.log_std).expand_as(mean)
         base = Normal(mean, std)
 
@@ -281,6 +523,39 @@ class PPOContinuous(BaseAgent):
             return base.log_prob(a).sum(dim=-1)
 
     def _ppo_update(self):
+        """
+        Core PPO update logic for continuous action spaces.
+
+        Performs the main training loop for Proximal Policy Optimization,
+        including actor and critic updates using the clipped surrogate objective
+        and Generalized Advantage Estimation (GAE).
+
+        Workflow
+        --------
+        1. Stack rollout buffer into tensors of shape (T, N).
+        2. Compute GAE advantages and returns using rewards, values, and dones.
+        3. Flatten tensors into shape (T*N, ...).
+        4. Normalize advantages across the batch.
+        5. For each update epoch:
+        - Shuffle indices and sample mini-batches.
+        - Compute new log probabilities and entropy from the policy.
+        - Calculate importance sampling ratios.
+        - Apply clipped surrogate objective for actor loss.
+        - Compute critic loss as MSE between predicted values and returns.
+        - Optimize actor and critic networks with gradient clipping.
+
+        Notes
+        -----
+        - Actor loss includes entropy bonus for exploration.
+        - Critic loss is scaled by ``value_coef``.
+        - Updates are performed for ``update_epochs`` passes over the rollout.
+
+        Returns
+        -------
+        None
+            Updates actor and critic networks in-place.
+        """
+
         self.policy_net.train()
         self.value_net.train()
 
@@ -359,9 +634,25 @@ class PPOContinuous(BaseAgent):
 
     def reset(self):
         """
-        Resets the agent state for a new, independent run by rebuilding the networks
-        using the stored architecture, guaranteeing fresh, random weights.
+        Reset the agent state for a new run.
+
+        Reinitializes the policy and value networks, optimizers, and clears
+        the rollout buffer and cached transitions.
+
+        Workflow
+        --------
+        1. Rebuild policy and value networks with fresh weights.
+        2. Reinitialize learnable log standard deviation parameter.
+        3. Reinitialize Adam optimizers for actor and critic.
+        4. Clear rollout buffer and reset step counter.
+        5. Reset cached previous state, action, log probability, and value.
+
+        Returns
+        -------
+        None
+            Agent state and networks are reset.
         """
+
         # 1. Rebuild and Re-randomize Networks using the internal builder
         self.policy_net = self._create_network(self.state_dim, self.action_dim).to(self.device)
         self.value_net  = self._create_network(self.state_dim, 1).to(self.device)

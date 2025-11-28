@@ -1,21 +1,45 @@
 import numpy as np
 
-from rlforge.agents import BaseAgent # Assumed base class
-from rlforge.policies import softmax  # Assumed utility function for softmax
-from rlforge.feature_extraction import TileCoder # Assumed feature extractor
-from rlforge.function_approximation import LinearRegression # Assumed function approximator
+from ...agents import BaseAgent 
+from ...policies import softmax 
+from ...feature_extraction import TileCoder
+from ...function_approximation import LinearRegression 
 
 class REINFORCEAgent(BaseAgent):
     """
-    REINFORCE (Monte Carlo Policy Gradient) Agent for discrete action spaces,
-    using linear function approximation over tile-coded features.
+    REINFORCE (Monte Carlo Policy Gradient) Agent for discrete action spaces.
 
-    Implements:
-    1. Vanilla REINFORCE (baseline=False): Uses Monte Carlo Return (G_t) as the factor.
-    2. REINFORCE with Baseline (baseline=True): Uses Advantage A_t = G_t - V(s_t, w) as the factor.
+    This agent implements the REINFORCE algorithm using linear function
+    approximation over tile-coded features. It supports both vanilla
+    REINFORCE and REINFORCE with a baseline.
 
-    References: Sutton & Barto, Chapter 13.
+    - Vanilla REINFORCE (baseline=False): Uses Monte Carlo return G_t as the update factor.
+    - REINFORCE with Baseline (baseline=True): Uses advantage A_t = G_t - V(s_t, w) as the update factor.
+
+    Parameters
+    ----------
+    num_actions : int
+        Number of discrete actions available in the environment.
+    dims_ranges : list of tuple
+        Ranges for each state dimension, used by the tile coder.
+    alpha_theta : float, optional
+        Policy step size (default=2e-3).
+    alpha_w : float, optional
+        Baseline step size (default=2e-3). Only used if baseline=True.
+    discount : float, optional
+        Discount factor γ applied to future rewards (default=0.99).
+    iht_size : int, optional
+        Size of the index hash table for tile coding (default=4096).
+    num_tilings : int, optional
+        Number of tilings used in tile coding (default=8).
+    num_tiles : int, optional
+        Number of tiles per dimension (default=8).
+    baseline : bool, optional
+        Whether to use a baseline value function (default=False).
+    wrap_dims : tuple, optional
+        Dimensions to wrap in tile coding (default=()).
     """
+
 
     def __init__(self, 
                  num_actions, 
@@ -27,7 +51,7 @@ class REINFORCEAgent(BaseAgent):
                  num_tilings=8, 
                  num_tiles=8, 
                  baseline=False, 
-                 wrap_dims=()):
+                 wrap_dims=()):  
 
         self.alpha_theta = alpha_theta
         self.alpha_w = alpha_w
@@ -56,14 +80,23 @@ class REINFORCEAgent(BaseAgent):
     
     def start(self, state):
         """
-        Begins a new episode.
-        
-        Args:
-            state (np.ndarray): The initial state/feature vector.
-            
-        Returns:
-            int: The chosen action.
+        Begin a new episode.
+
+        Extracts active tiles for the initial state, computes action
+        preferences, applies softmax to obtain action probabilities,
+        samples an action, and caches the state-action pair.
+
+        Parameters
+        ----------
+        state : np.ndarray
+            The initial state or feature vector.
+
+        Returns
+        -------
+        int
+            The chosen action.
         """
+
         self.trajectory = []
         
         # 1. Feature extraction
@@ -94,11 +127,25 @@ class REINFORCEAgent(BaseAgent):
 
     def step(self, reward, state):
         """
-        Performs a step transition and stores the transition (S, A, R).
-        
-        Returns:
-            int: The next action.
+        Perform a step transition.
+
+        Stores the transition (S_t, A_t, R_{t+1}), computes action
+        preferences for the new state, applies softmax, samples the
+        next action, and caches it.
+
+        Parameters
+        ----------
+        reward : float
+            Reward received from the previous action.
+        state : np.ndarray
+            The new state observed from the environment.
+
+        Returns
+        -------
+        int
+            The next action chosen by the agent.
         """
+
         # Store the current transition (s_t, a_t, r_{t+1})
         self.trajectory.append((self.prev_tiles, self.prev_action, reward))
         
@@ -129,8 +176,19 @@ class REINFORCEAgent(BaseAgent):
     
     def end(self, reward):
         """
-        Processes the final reward and executes the Monte Carlo update.
+        Process the final reward and execute the Monte Carlo update.
+
+        Computes returns G_t for the entire episode, calculates the
+        update factor (G_t or A_t depending on baseline usage), updates
+        the baseline function if enabled, and applies the policy gradient
+        update to the actor.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received at the end of the episode.
         """
+
         # Store the final transition
         self.trajectory.append((self.prev_tiles, self.prev_action, reward))
 
@@ -187,7 +245,13 @@ class REINFORCEAgent(BaseAgent):
                                           action=a, state=tiles_t, tile_coding_indices=True)
 
     def reset(self):
-        """Resets the agent's internal state for a new experiment run."""
+        """
+        Reset the agent's internal state.
+
+        Resets the actor (and baseline if enabled), clears the trajectory,
+        and resets cached state-action pairs for a new experiment run.
+        """
+
         self.actor.reset_weights()
         if self.use_baseline:
             self.baseline_func.reset_weights()

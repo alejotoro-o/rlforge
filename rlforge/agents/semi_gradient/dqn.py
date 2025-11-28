@@ -1,10 +1,10 @@
 import numpy as np
 from copy import deepcopy
 
-from rlforge.policies import softmax
-from rlforge.agents import BaseAgent
-from rlforge.function_approximation import MLP
-from rlforge.utils import ExperienceBuffer
+from ...policies import softmax
+from ...agents import BaseAgent
+from ...function_approximation import MLP
+from ...utils import ExperienceBuffer
 
 class DQNAgent(BaseAgent):
     """

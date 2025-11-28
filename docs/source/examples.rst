@@ -11,4 +11,11 @@ Examples
    examples/dynaArchitecture
    examples/linearFunctionApproximation
    examples/dqn_mountainCar
+   examples/dqn_pytorch_cartPole
+   examples/reinforce_shortCorridor
    examples/actorCritic_pendulum
+   examples/ddpg_pendulum
+   examples/td3_pendulum
+   examples/sac_pendulum
+   examples/ppo_cartPole
+   examples/ppo_pendulum

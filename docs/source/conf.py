@@ -11,9 +11,9 @@ import sys
 sys.path.insert(0, os.path.abspath('../..'))
 
 project = 'rlforge'
-copyright = '2023, Alejandro Toro-Ossaba'
+copyright = '2025, Alejandro Toro-Ossaba'
 author = 'Alejandro Toro-Ossaba'
-release = '0.0.2'
+release = '1.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

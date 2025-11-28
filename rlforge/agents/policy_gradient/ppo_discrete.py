@@ -7,12 +7,50 @@ from ..base_agent import BaseAgent
 
 class PPODiscrete(BaseAgent):
     """
-    PPO for discrete action spaces with GAE, adapted for vectorized (N) environments.
-    - Separate actor/critic LRs
+    Proximal Policy Optimization (PPO) Agent for discrete action spaces.
+
+    This agent implements PPO with Generalized Advantage Estimation (GAE),
+    adapted for vectorized environments. It supports rollout-based updates,
+    advantage normalization, and the clipped surrogate objective.
+
+    Features
+    --------
+    - Separate actor and critic learning rates
     - Rollout-based updates with GAE
     - Vectorized batch processing (T, N)
     - Advantage normalization
-    - Clipped objective
+    - Clipped objective for stable updates
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimension of the input state space.
+    num_actions : int
+        Number of discrete actions available in the environment.
+    actor_lr : float, optional
+        Learning rate for the actor/policy network (default=3e-4).
+    critic_lr : float, optional
+        Learning rate for the critic/value network (default=3e-4).
+    discount : float, optional
+        Discount factor γ applied to future rewards (default=0.99).
+    clip_epsilon : float, optional
+        Clipping parameter for PPO objective (default=0.2).
+    network_architecture : list of int, optional
+        Sizes of hidden layers for both actor and critic networks (default=[64, 64]).
+    update_epochs : int, optional
+        Number of epochs per PPO update (default=10).
+    mini_batch_size : int, optional
+        Size of mini-batches sampled during PPO updates (default=64).
+    rollout_length : int, optional
+        Number of transitions per environment before an update (default=1024).
+    value_coef : float, optional
+        Coefficient for value loss in PPO objective (default=0.5).
+    entropy_coeff : float, optional
+        Coefficient for entropy bonus in PPO objective (default=0.01).
+    gae_lambda : float, optional
+        GAE parameter λ controlling bias-variance tradeoff (default=0.95).
+    device : str or torch.device, optional
+        Device to run computations on ("cpu" or "cuda"). Defaults to CUDA if available.
     """
 
     def __init__(self, 
@@ -73,6 +111,26 @@ class PPODiscrete(BaseAgent):
         self.prev_value = None
 
     def _build_mlp(self, input_dim, output_dim, hidden_layers):
+        """
+        Build a standard feedforward MLP network.
+
+        Constructs a sequential model with Tanh activations in hidden layers.
+
+        Parameters
+        ----------
+        input_dim : int
+            Dimension of the input features.
+        output_dim : int
+            Dimension of the output (e.g., num_actions or 1 for value).
+        hidden_layers : list of int
+            Sizes of hidden layers.
+
+        Returns
+        -------
+        nn.Sequential
+            The constructed PyTorch network.
+        """
+
         layers = []
         last = input_dim
         for h in hidden_layers:
@@ -82,17 +140,63 @@ class PPODiscrete(BaseAgent):
         return nn.Sequential(*layers)
 
     def _to_tensor(self, x):
+        """
+        Convert input to a float32 tensor on the agent's device.
+
+        Parameters
+        ----------
+        x : array-like or scalar
+            Input data.
+
+        Returns
+        -------
+        torch.Tensor
+            Float tensor on the agent's device.
+        """
+
         return torch.as_tensor(x, dtype=torch.float32, device=self.device)
 
-    # --- Single-env methods (Wrappers) ---
     def start(self, new_state):
-        """Begin a new episode with a single environment."""
+        """
+        Begin a new episode in a single environment.
+
+        Parameters
+        ----------
+        new_state : array-like
+            Initial state of the environment.
+
+        Returns
+        -------
+        int
+            Selected action.
+        """
+
         # new_state: (state_dim,) -> (1, state_dim)
         actions = self.start_batch(np.expand_dims(new_state, axis=0))
         return actions[0]   # unwrap to scalar
 
     def step(self, reward, new_state, done=False):
-        """Take a step in a single environment."""
+        """
+        Take a step in a single environment.
+
+        Stores transition, performs updates if conditions are met,
+        and selects the next action.
+
+        Parameters
+        ----------
+        reward : float
+            Reward from the previous action.
+        new_state : array-like
+            Next state observed.
+        done : bool, optional
+            Whether the episode has terminated (default=False).
+
+        Returns
+        -------
+        int
+            Selected action.
+        """
+
         actions = self.step_batch(
             np.array([reward], dtype=np.float32),
             np.expand_dims(new_state, axis=0),
@@ -101,17 +205,34 @@ class PPODiscrete(BaseAgent):
         return actions[0]   # unwrap to scalar
 
     def end(self, reward):
-        """Complete an episode in a single environment."""
+        """
+        Complete an episode in a single environment.
+
+        Stores the final transition into the rollout buffer.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received at the end of the episode.
+        """
+
         self.end_batch(np.array([reward], dtype=np.float32))
 
-
-    # --- Batch versions (Vectorized Implementation) ---
     def start_batch(self, states):
         """
-        Begin a new episode with multiple environments (N).
-        states: (N, state_dim)
-        Returns: (N,) numpy array of actions
+        Begin a new episode with multiple environments.
+
+        Parameters
+        ----------
+        states : array-like, shape (N, state_dim)
+            Batch of initial states.
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N,).
         """
+
         S = self._to_tensor(states)  # (N, state_dim)
         
         self.policy_net.eval()
@@ -134,10 +255,26 @@ class PPODiscrete(BaseAgent):
 
     def step_batch(self, rewards, states, dones):
         """
-        Take a step with multiple environments (N).
-        rewards: (N,), states: (N, state_dim), dones: (N,)
-        Returns: (N,) numpy array of actions
+        Take a step in multiple environments.
+
+        Stores transitions in the rollout buffer, performs PPO updates if
+        conditions are met, and selects next actions.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Rewards from the previous actions.
+        states : array-like, shape (N, state_dim)
+            Next states observed.
+        dones : array-like, shape (N,)
+            Boolean flags indicating episode termination.
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N,).
         """
+
         # Store transition (S_t, A_t, R_t, V_t, done_t) from last step/start
         self.rollout_buffer['states'].append(self.prev_state)
         self.rollout_buffer['actions'].append(self.prev_action)
@@ -177,9 +314,17 @@ class PPODiscrete(BaseAgent):
 
     def end_batch(self, rewards):
         """
-        Complete episodes for multiple environments (N).
-        rewards: (N,)
+        Complete episodes for multiple environments.
+
+        Stores terminal transitions into the rollout buffer and performs PPO
+        updates if conditions are met.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Final rewards received for each terminated environment.
         """
+
         N = len(rewards)
         
         # Store final transition
@@ -199,12 +344,26 @@ class PPODiscrete(BaseAgent):
 
     def _compute_gae_advantages(self, rewards, dones, values, last_value):
         """
-        Calculates GAE advantages and returns for vectorized (T, N) tensors.
-        
-        Inputs: rewards (T, N), dones (T, N), values (T, N)
-        last_value: (N,) - V(S_{T+1}) or zero
-        Outputs: advantages (T, N), returns (T, N)
+        Compute Generalized Advantage Estimation (GAE) advantages and returns.
+
+        Parameters
+        ----------
+        rewards : torch.Tensor, shape (T, N)
+            Rewards collected during rollout.
+        dones : torch.Tensor, shape (T, N)
+            Boolean flags indicating episode termination.
+        values : torch.Tensor, shape (T, N)
+            Value function estimates for each state.
+        last_value : torch.Tensor, shape (N,)
+            Value estimate for the final state or zero if terminal.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            advantages : (T, N) tensor of GAE advantages
+            returns : (T, N) tensor of discounted returns
         """
+
         T, N = rewards.shape
         advantages = torch.zeros_like(values)
         returns = torch.zeros_like(values)
@@ -233,6 +392,39 @@ class PPODiscrete(BaseAgent):
 
 
     def _ppo_update(self):
+        """
+        Core PPO update logic.
+
+        Performs the main training loop for Proximal Policy Optimization,
+        including actor and critic updates using the clipped surrogate objective
+        and Generalized Advantage Estimation (GAE).
+
+        Workflow
+        --------
+        1. Stack rollout buffer into tensors of shape (T, N).
+        2. Compute GAE advantages and returns using rewards, values, and dones.
+        3. Flatten tensors into shape (T*N, ...).
+        4. Normalize advantages across the batch.
+        5. For each update epoch:
+            - Shuffle indices and sample mini-batches.
+            - Compute new log probabilities and entropy from the policy.
+            - Calculate importance sampling ratios.
+            - Apply clipped surrogate objective for actor loss.
+            - Compute critic loss as MSE between predicted values and returns.
+            - Optimize actor and critic networks with gradient clipping.
+
+        Notes
+        -----
+        - Actor loss includes entropy bonus for exploration.
+        - Critic loss is scaled by ``value_coef``.
+        - Updates are performed for ``update_epochs`` passes over the rollout.
+
+        Returns
+        -------
+        None
+            Updates actor and critic networks in-place.
+        """
+
         self.policy_net.train()
         self.value_net.train()
 
@@ -312,6 +504,25 @@ class PPODiscrete(BaseAgent):
                 self.critic_opt.step()
 
     def reset(self):
+        """
+        Reset the agent state for a new run.
+
+        Reinitializes the policy and value networks, optimizers, and clears
+        the rollout buffer and cached transitions.
+
+        Workflow
+        --------
+        1. Rebuild policy and value networks with fresh weights.
+        2. Reinitialize Adam optimizers for actor and critic.
+        3. Clear rollout buffer and reset step counter.
+        4. Reset cached previous state, action, log probability, and value.
+
+        Returns
+        -------
+        None
+            Agent state and networks are reset.
+        """
+
         # Reinitialize networks and optimizers
         self.policy_net = self._build_mlp(self.state_dim, self.num_actions, self.network_architecture).to(self.device)
         self.value_net  = self._build_mlp(self.state_dim, 1,               self.network_architecture).to(self.device)

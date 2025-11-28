@@ -10,17 +10,25 @@ from ..base_agent import BaseAgent
 
 def softmax(x, temperature=1.0):
     """
-    Computes the softmax over the last dimension of an array.
-    Used for converting Q-values into a probability distribution for exploration.
+    Compute the softmax over the last dimension of an array.
 
-    Args:
-        x (np.ndarray): The input Q-values (typically N, action_dim).
-        temperature (float): Controls the entropy of the distribution. 
-                             Higher temperature results in more random actions.
-    
-    Returns:
-        np.ndarray: The softmax probabilities (same shape as x).
+    This is typically used to convert Q-values into a probability distribution
+    for exploration.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input Q-values, typically of shape (N, action_dim).
+    temperature : float
+        Controls the entropy of the distribution. Higher temperature results
+        in more random actions.
+
+    Returns
+    -------
+    np.ndarray
+        Softmax probabilities with the same shape as `x`.
     """
+
     # Apply temperature
     x_temp = x / temperature
     
@@ -66,7 +74,40 @@ class ReplayBuffer:
 
 # --- Main Agent Class ---
 
-class DQNTorchAgent(BaseAgent): 
+class DQNTorchAgent(BaseAgent):
+    """
+    Deep Q-Network (DQN) Agent implemented in PyTorch.
+
+    This agent uses a feedforward neural network to approximate Q-values
+    for discrete actions. It supports both single-environment and
+    vectorized-environment APIs, experience replay, and a target network
+    for stable training.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimension of the input state space.
+    action_dim : int
+        Number of discrete actions available in the environment.
+    network_architecture : tuple of int, optional
+        Sizes of hidden layers in the Q-network (default=(64, 64)).
+    learning_rate : float, optional
+        Learning rate for the optimizer (default=1e-3).
+    discount : float, optional
+        Discount factor γ applied to future rewards (default=0.99).
+    temperature : float, optional
+        Temperature parameter for softmax exploration (default=1.0).
+    target_network_update_steps : int, optional
+        Number of training steps between target network synchronizations (default=1000).
+    num_replay : int, optional
+        Number of replay updates per environment step (default=1).
+    experience_buffer_size : int, optional
+        Maximum size of the replay buffer (default=100000).
+    mini_batch_size : int, optional
+        Size of mini-batches sampled from the replay buffer (default=32).
+    device : str or torch.device, optional
+        Device to run computations on ("cpu" or "cuda").
+    """
 
     def __init__(self, 
                  state_dim, 
@@ -111,12 +152,46 @@ class DQNTorchAgent(BaseAgent):
     # --- Network Building Helpers ---
 
     def _weights_init(self, m):
+        """
+        Initialize weights of linear layers.
+
+        Uses Kaiming uniform initialization for weights and sets biases to zero.
+
+        Parameters
+        ----------
+        m : nn.Module
+            A PyTorch module (typically nn.Linear) to initialize.
+        """
+
         if isinstance(m, nn.Linear):
             nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
     
     def _create_network(self, input_dim, output_dim, architecture, final_activation=None):
+        """
+        Build a feedforward neural network.
+
+        Constructs a sequential model with ReLU activations and optional
+        final activation.
+
+        Parameters
+        ----------
+        input_dim : int
+            Dimension of the input features.
+        output_dim : int
+            Dimension of the output (number of actions).
+        architecture : tuple of int
+            Sizes of hidden layers.
+        final_activation : nn.Module, optional
+            Activation function applied to the final layer.
+
+        Returns
+        -------
+        nn.Sequential
+            The constructed PyTorch network.
+        """
+
         layers = []
         current_dim = input_dim
         
@@ -135,11 +210,21 @@ class DQNTorchAgent(BaseAgent):
         return net.to(self.device)
 
     def _sync_target_network(self):
-        """Copies the weights from the main network to the target network."""
+        """
+        Synchronize target network with main network.
+
+        Copies the weights from the main Q-network to the target Q-network.
+        """
+
         self.target_network.load_state_dict(self.main_network.state_dict())
 
     def reset_networks(self):
-        """Rebuilds all networks and optimizers from scratch."""
+        """
+        Reset and rebuild networks and optimizer.
+
+        Creates a new main network and target network, initializes weights,
+        and sets up the Adam optimizer.
+        """
         
         self.main_network = self._create_network(
             self.state_dim, 
@@ -154,16 +239,63 @@ class DQNTorchAgent(BaseAgent):
         self.optimizer = optim.Adam(self.main_network.parameters(), lr=self._initial_lr)
 
     def _to_tensor(self, x):
-        return torch.as_tensor(x, dtype=torch.float32, device=self.device)
+        """
+        Convert input to a PyTorch tensor.
 
-    # --- Single-Environment API Wrappers ---
-    # These mirror the DDPG structure for compatibility
+        Parameters
+        ----------
+        x : array-like
+            Input data.
+
+        Returns
+        -------
+        torch.Tensor
+            Float tensor on the agent's device.
+        """
+
+        return torch.as_tensor(x, dtype=torch.float32, device=self.device)
     
     def start(self, state):
+        """
+        Begin a new episode in a single environment.
+
+        Selects an initial action based on the current state.
+
+        Parameters
+        ----------
+        state : array-like
+            Initial state of the environment.
+
+        Returns
+        -------
+        int
+            Selected action.
+        """
+
         actions = self.start_batch(np.expand_dims(state, axis=0)) 
         return actions[0].item()
 
     def step(self, reward, new_state, terminal=False):
+        """
+        Take a step in a single environment.
+
+        Updates replay buffer and selects the next action.
+
+        Parameters
+        ----------
+        reward : float
+            Reward received from the previous action.
+        new_state : array-like
+            Next state observed.
+        terminal : bool, optional
+            Whether the episode has terminated (default=False).
+
+        Returns
+        -------
+        int
+            Selected action.
+        """
+
         actions = self.step_batch(
             np.array([reward], dtype=np.float32),
             np.expand_dims(new_state, axis=0),
@@ -172,6 +304,17 @@ class DQNTorchAgent(BaseAgent):
         return actions[0].item()
 
     def end(self, reward):
+        """
+        Complete an episode in a single environment.
+
+        Stores the final transition into the replay buffer.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received at the end of the episode.
+        """
+
         self.end_batch(np.array([reward], dtype=np.float32))
 
 
@@ -179,8 +322,23 @@ class DQNTorchAgent(BaseAgent):
 
     def start_batch(self, states, deterministic=False):
         """
-        Begin a batch of episodes by selecting actions for N environments.
+        Begin a batch of episodes.
+
+        Selects actions for multiple environments simultaneously.
+
+        Parameters
+        ----------
+        states : array-like, shape (N, state_dim)
+            Batch of initial states.
+        deterministic : bool, optional
+            If True, selects greedy actions; otherwise uses softmax exploration.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of selected actions of shape (N,).
         """
+
         S = self._to_tensor(states) # (N, state_dim)
         
         self.main_network.eval()
@@ -203,8 +361,28 @@ class DQNTorchAgent(BaseAgent):
 
     def step_batch(self, rewards, next_states, dones, deterministic=False):
         """
-        Take a step for N environments, update buffer with (S_t, A_t, R_t, S_{t+1}, Done_t), and train.
+        Take a step in multiple environments.
+
+        Stores transitions in the replay buffer, performs training updates,
+        synchronizes the target network if needed, and selects next actions.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Rewards from the previous actions.
+        next_states : array-like, shape (N, state_dim)
+            Next states observed.
+        dones : array-like, shape (N,)
+            Boolean flags indicating episode termination.
+        deterministic : bool, optional
+            If True, selects greedy actions; otherwise uses softmax exploration.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of selected actions of shape (N,).
         """
+
         N_envs = rewards.shape[0]
 
         # 1. Store transitions (S_t, A_t, R_t, S_{t+1}, Done_t) into Replay Buffer
@@ -254,10 +432,28 @@ class DQNTorchAgent(BaseAgent):
 
     def end_batch(self, rewards):
         """
-        Handle the final reward/transition for N terminated environments.
-        This assumes the agent's internal prev_state/action is still valid for 
-        the transitions that are now ending.
+        Handle the final reward and transition for a batch of terminated environments.
+
+        This method stores terminal transitions into the replay buffer and performs
+        training updates if enough samples are available. It assumes that the agent's
+        internal caches for previous states and actions are valid for the terminated
+        episodes.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Final rewards received for each of the N terminated environments.
+
+        Notes
+        -----
+        - Each terminal transition is stored as (S_t, A_t, R_t, S_{t+1}=S_t, Done=True).
+        - Training is triggered after storing transitions if the replay buffer
+          contains at least ``mini_batch_size`` samples.
+        - The internal state/action cache is reset if all environments in the batch
+          have terminated.
+
         """
+
         N_envs = rewards.shape[0]
         R = np.atleast_1d(rewards) 
         
@@ -302,7 +498,25 @@ class DQNTorchAgent(BaseAgent):
     def _train_step(self):
         """
         Perform a single training step using a mini-batch from the replay buffer.
+
+        Samples a batch of transitions, computes the TD target using the target
+        network, and updates the main Q-network by minimizing the mean squared
+        error between predicted Q-values and targets.
+
+        Workflow
+        --------
+        1. Sample a mini-batch of transitions from the replay buffer.
+        2. Compute Q(s,a) for the sampled states and actions using the main network.
+        3. Compute TD targets: ``y = r + γ * max(Q_target(s')) * (1 - terminal)``.
+        4. Calculate loss as MSE between Q(s,a) and targets.
+        5. Backpropagate and update network parameters with gradient clipping.
+
+        Returns
+        -------
+        None
+            Updates the main network weights in-place.
         """
+
         sampled_batch = self.experience_buffer.sample()
         if not sampled_batch:
             return 
@@ -341,9 +555,18 @@ class DQNTorchAgent(BaseAgent):
 
     def reset(self):
         """
-        Resets the agent's internal state (buffer, step counter, etc.) AND 
-        rebuilds the networks via reset_networks for a fresh start.
+        Reset the agent's internal state and networks.
+
+        Clears the replay buffer, resets counters, and rebuilds the main and target
+        networks for a fresh start.
+
+        Notes
+        -----
+        - Resets ``elapsed_training_steps`` and ``total_steps`` to zero.
+        - Clears cached previous state and action.
+        - Calls ``reset_networks()`` to reinitialize the Q-networks and optimizer.
         """
+
         self.reset_networks()
         self.experience_buffer.clear()
         self.elapsed_training_steps = 0

@@ -9,9 +9,54 @@ from ..base_agent import BaseAgent # Assuming BaseAgent is available
 
 class TD3Agent(BaseAgent):
     """
-    Twin Delayed Deep Deterministic Policy Gradient (TD3) for continuous action spaces.
-    Enhances DDPG with three core mechanisms: Twin Critics, Delayed Policy Updates,
-    and Target Policy Smoothing.
+    Twin Delayed Deep Deterministic Policy Gradient (TD3) Agent for continuous action spaces.
+
+    TD3 enhances the Deep Deterministic Policy Gradient (DDPG) algorithm with three
+    core mechanisms:
+    - Twin Critics: Two Q-networks to reduce overestimation bias.
+    - Delayed Policy Updates: The actor (policy) is updated less frequently than the critics.
+    - Target Policy Smoothing: Adds clipped noise to target actions for more stable training.
+
+    Parameters
+    ----------
+    state_dim : int
+        Dimension of the input state space.
+    action_dim : int
+        Dimension of the continuous action space.
+    policy_net_architecture : tuple of int, optional
+        Hidden layer sizes for the actor/policy network (default=(256, 256)).
+    q_net_architecture : tuple of int, optional
+        Hidden layer sizes for the critic/Q-networks (default=(256, 256)).
+    actor_lr : float, optional
+        Learning rate for the actor network (default=1e-4).
+    critic_lr : float, optional
+        Learning rate for the critic networks (default=1e-3).
+    discount : float, optional
+        Discount factor γ applied to future rewards (default=0.99).
+    tau : float, optional
+        Polyak averaging factor for soft target network updates (default=0.005).
+    update_frequency : int, optional
+        Frequency (in steps) of training updates (default=1).
+    buffer_size : int, optional
+        Maximum size of the replay buffer (default=1,000,000).
+    mini_batch_size : int, optional
+        Size of mini-batches sampled from the replay buffer (default=256).
+    update_start_size : int, optional
+        Minimum number of transitions before updates begin (default=256).
+    action_low : float or np.ndarray, optional
+        Lower bound(s) for continuous actions.
+    action_high : float or np.ndarray, optional
+        Upper bound(s) for continuous actions.
+    noise_std : float, optional
+        Standard deviation of Gaussian exploration noise added to actions (default=0.1).
+    policy_delay : int, optional
+        Delay factor for policy and target network updates (default=2).
+    target_noise_std : float, optional
+        Standard deviation of noise added to target actions during critic updates (default=0.2).
+    target_noise_clip : float, optional
+        Clipping value for target action noise (default=0.5).
+    device : str or torch.device, optional
+        Device to run computations on ("cpu" or "cuda"). Defaults to CUDA if available.
     """
 
     def __init__(self,
@@ -82,14 +127,47 @@ class TD3Agent(BaseAgent):
     # --- Network Building Helpers (Inherited from DDPG) ---
 
     def _weights_init(self, m):
-        """Standard Kaiming Uniform initialization for Tanh/ReLU layers."""
+        """
+        Initialize weights for linear layers.
+
+        Uses Kaiming uniform initialization for weights and sets biases to zero
+        for stability in ReLU/Tanh networks.
+
+        Parameters
+        ----------
+        m : nn.Module
+            PyTorch module (typically nn.Linear) to initialize.
+        """
+
         if isinstance(m, nn.Linear):
             nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
     def _create_network(self, input_dim, output_dim, architecture, final_activation=None):
-        """Helper function to build a standard MLP (Sequential)."""
+        """
+        Build a standard feedforward MLP network.
+
+        Constructs a sequential model with ReLU activations in hidden layers
+        and an optional final activation.
+
+        Parameters
+        ----------
+        input_dim : int
+            Dimension of the input features.
+        output_dim : int
+            Dimension of the output (e.g., action_dim or 1 for Q-value).
+        architecture : tuple of int
+            Sizes of hidden layers.
+        final_activation : nn.Module, optional
+            Activation function applied to the final layer.
+
+        Returns
+        -------
+        nn.Sequential
+            The constructed PyTorch network.
+        """
+
         layers = []
         current_dim = input_dim
 
@@ -110,25 +188,88 @@ class TD3Agent(BaseAgent):
         return net
 
     def _set_device_and_train_mode(self, net, requires_grad):
-        """Helper to move network to device and set parameter requirement."""
+        """
+        Move network to device and set training/evaluation mode.
+
+        Parameters
+        ----------
+        net : nn.Module
+            The network to configure.
+        requires_grad : bool
+            If True, enables training mode and gradients; otherwise sets eval mode
+            and disables gradients.
+        """
+
         net.to(self.device)
         net.train() if requires_grad else net.eval()
         for param in net.parameters():
             param.requires_grad = requires_grad
 
     def _to_tensor(self, x):
-        """Convert numpy array/python value to float32 tensor on device."""
+        """
+        Convert input to a float32 tensor on the agent's device.
+
+        Parameters
+        ----------
+        x : array-like or scalar
+            Input data.
+
+        Returns
+        -------
+        torch.Tensor
+            Float tensor on the agent's device.
+        """
+
         return torch.as_tensor(x, dtype=torch.float32, device=self.device)
 
     def _q_net_forward(self, q_net, state, action):
-        """Wrapper for Q-Net forward pass which requires concatenation."""
+        """
+        Forward pass through a Q-network.
+
+        Concatenates state and action before passing through the Q-network.
+
+        Parameters
+        ----------
+        q_net : nn.Module
+            The Q-network to evaluate.
+        state : torch.Tensor
+            Batch of states.
+        action : torch.Tensor
+            Batch of actions.
+
+        Returns
+        -------
+        torch.Tensor
+            Predicted Q-values.
+        """
+
         sa = torch.cat([state, action], dim=-1)
         return q_net(sa)
 
     def _sample_action(self, mean, deterministic=False, action_low_np=None, action_high_np=None):
         """
-        Calculates the final action, optionally adding exploration noise (for training).
+        Sample and scale an action from the policy output.
+
+        Rescales the policy output from [-1, 1] to environment bounds,
+        optionally adds Gaussian exploration noise, and clips to bounds.
+
+        Parameters
+        ----------
+        mean : torch.Tensor
+            Policy network output (mean action in [-1, 1]).
+        deterministic : bool, optional
+            If True, returns mean action without noise (default=False).
+        action_low_np : np.ndarray
+            Lower bounds for actions.
+        action_high_np : np.ndarray
+            Upper bounds for actions.
+
+        Returns
+        -------
+        torch.Tensor
+            Final action tensor clipped to environment bounds.
         """
+
         low = self._to_tensor(action_low_np)
         high = self._to_tensor(action_high_np)
 
@@ -147,10 +288,49 @@ class TD3Agent(BaseAgent):
 
     # --- Standard RL Agent Interface (Wrapper Methods) ---
     def start(self, state, deterministic=False):
+        """
+        Begin a new episode in a single environment.
+
+        Parameters
+        ----------
+        state : array-like
+            Initial state of the environment.
+        deterministic : bool, optional
+            If True, selects deterministic actions (default=False).
+
+        Returns
+        -------
+        np.ndarray
+            Selected action.
+        """
+
         actions = self.start_batch(np.expand_dims(state, axis=0), deterministic)
         return actions[0]
 
     def step(self, reward, state, done=False, deterministic=False):
+        """
+        Take a step in a single environment.
+
+        Stores transition, performs updates if conditions are met,
+        and selects the next action.
+
+        Parameters
+        ----------
+        reward : float
+            Reward from the previous action.
+        state : array-like
+            Next state observed.
+        done : bool, optional
+            Whether the episode has terminated (default=False).
+        deterministic : bool, optional
+            If True, selects deterministic actions (default=False).
+
+        Returns
+        -------
+        np.ndarray
+            Selected action.
+        """
+
         actions = self.step_batch(
             np.array([reward], dtype=np.float32),
             np.expand_dims(state, axis=0),
@@ -160,10 +340,39 @@ class TD3Agent(BaseAgent):
         return actions[0]
 
     def end(self, reward):
+        """
+        Complete an episode in a single environment.
+
+        Stores the final transition into the replay buffer.
+
+        Parameters
+        ----------
+        reward : float
+            Final reward received at the end of the episode.
+        """
+
         self.end_batch(np.array([reward], dtype=np.float32))
 
     # --- Batch implementation ---
     def start_batch(self, states, deterministic=False):
+        """
+        Begin a batch of episodes.
+
+        Selects actions for multiple environments simultaneously.
+
+        Parameters
+        ----------
+        states : array-like, shape (N, state_dim)
+            Batch of initial states.
+        deterministic : bool, optional
+            If True, selects deterministic actions (default=False).
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N, action_dim).
+        """
+
         S = self._to_tensor(states)
         self.policy_net.eval()
         with torch.no_grad():
@@ -181,6 +390,29 @@ class TD3Agent(BaseAgent):
         return actions.detach().cpu().numpy()
 
     def step_batch(self, rewards, next_states, dones, deterministic=False):
+        """
+        Take a step in multiple environments.
+
+        Stores transitions in the replay buffer, performs TD3 updates if
+        conditions are met, and selects next actions.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Rewards from the previous actions.
+        next_states : array-like, shape (N, state_dim)
+            Next states observed.
+        dones : array-like, shape (N,)
+            Boolean flags indicating episode termination.
+        deterministic : bool, optional
+            If True, selects deterministic actions (default=False).
+
+        Returns
+        -------
+        np.ndarray
+            Array of selected actions of shape (N, action_dim).
+        """
+
         N_envs = rewards.shape[0]
         S_prime = self._to_tensor(next_states)
         R = self._to_tensor(rewards)
@@ -219,6 +451,18 @@ class TD3Agent(BaseAgent):
         return actions.detach().cpu().numpy()
 
     def end_batch(self, rewards):
+        """
+        Complete a batch of episodes.
+
+        Stores terminal transitions into the replay buffer and performs TD3
+        updates if conditions are met.
+
+        Parameters
+        ----------
+        rewards : array-like, shape (N,)
+            Final rewards received for each terminated environment.
+        """
+
         N_envs = rewards.shape[0]
         R = self._to_tensor(rewards)
 
@@ -239,7 +483,37 @@ class TD3Agent(BaseAgent):
 
 
     def _td3_update(self):
-        """TD3 core update logic."""
+        """
+        Core TD3 update logic.
+
+        Performs the main training loop for TD3, including critic updates,
+        delayed actor updates, and Polyak averaging for target networks.
+
+        Workflow
+        --------
+        1. Sample a mini-batch of transitions from the replay buffer.
+        2. Compute target Q-values using target policy and target critics:
+        - Apply target policy smoothing by adding clipped Gaussian noise
+            to target actions.
+        - Use clipped double Q-learning (min(Q1, Q2)) to reduce bias.
+        3. Update both critics (Q1 and Q2) by minimizing MSE loss against
+        the target Q-values.
+        4. Every ``policy_delay`` steps:
+        - Update the actor by maximizing Q1(s, π(s)).
+        - Soft-update target networks using Polyak averaging.
+
+        Notes
+        -----
+        - Critic updates occur at every training step.
+        - Actor and target network updates are delayed by ``policy_delay``.
+        - Target actions are clipped to the environment's action bounds.
+
+        Returns
+        -------
+        None
+            Updates actor and critic networks in-place.
+        """
+
         # Set all networks to training mode, including target networks for Polyak update
         # Policy is only updated on policy_delay cycles, but we set train mode every time for critic updates.
         self._set_device_and_train_mode(self.policy_net, True)
@@ -333,9 +607,25 @@ class TD3Agent(BaseAgent):
 
     def reset_nets_and_opts(self):
         """
-        Internal function to build/rebuild all networks and optimizers,
-        including the twin Q-networks.
+        Build or rebuild all networks and optimizers.
+
+        Initializes the policy network, twin Q-networks, and their target
+        counterparts. Also sets up optimizers for the actor and both critics.
+
+        Workflow
+        --------
+        1. Construct the policy network with Tanh activation on the output.
+        2. Construct twin Q-networks (Q1 and Q2).
+        3. Deep copy networks to create target policy and target critics.
+        4. Set target networks to evaluation mode (no gradient updates).
+        5. Initialize Adam optimizers for actor and critics.
+
+        Returns
+        -------
+        None
+            Networks and optimizers are rebuilt in-place.
         """
+
         q_input_dim = self.state_dim + self.action_dim
 
         # 1. Build Policy Net
@@ -364,8 +654,23 @@ class TD3Agent(BaseAgent):
 
     def reset(self):
         """
-        Resets the agent state for a new, independent run.
+        Reset the agent state for a new run.
+
+        Clears the replay buffer, resets counters, and rebuilds networks
+        and optimizers to start training from scratch.
+
+        Notes
+        -----
+        - Resets ``total_steps`` to zero.
+        - Clears cached previous state and action.
+        - Calls ``reset_nets_and_opts()`` to reinitialize networks.
+
+        Returns
+        -------
+        None
+            Agent state and networks are reset.
         """
+
         self.reset_nets_and_opts()
 
         self.replay_buffer.clear()

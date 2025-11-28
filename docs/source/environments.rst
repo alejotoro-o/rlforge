@@ -13,10 +13,15 @@ to extend experiments to a wide variety of standardized benchmarks.
 Available environments
 -----------------------
 
+- **Bandits** — a simple environment family for testing exploration strategies
+  and reward maximization in multi-armed bandit problems.
 - **Dyna Maze** — a grid-based maze environment ideal for testing planning and
   model-based reinforcement learning algorithms.
 - **Shortcut Maze** — a variation of the maze environment with multiple paths,
   emphasizing exploration and the discovery of efficient trajectories.
+- **Short Corridor** — a small episodic environment with a biased action space,
+  commonly used to illustrate policy gradient behavior and the importance of
+  exploration in constrained settings.
 - **Pendulum** — a classic continuous control task where the agent learns to
   balance and swing up a pendulum.
 - **Mecanum Car** — a robotics-inspired environment simulating a mecanum-wheeled
@@ -33,8 +38,10 @@ architectures, from tabular methods to deep reinforcement learning approaches.
 .. toctree::
     :maxdepth: 1
 
+    environments/bandits
     environments/dyna_maze
     environments/shortcut_maze
+    environments/short_corridor
     environments/pendulum
     environments/mecanum_car
     environments/obstacle_avoidance

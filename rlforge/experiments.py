@@ -5,28 +5,103 @@ import matplotlib.pyplot as plt
 
 class ExperimentRunner:
     """
-    A unified class to run reinforcement learning experiments across multiple
-    runs and episodes/steps, handling both standard and vectorized environments.
-    Includes built-in functionality for summarizing and plotting results.
+    A unified class to run reinforcement learning experiments.
+
+    This runner supports both episodic and continuous settings across multiple
+    runs and environments. It manages agent resets, environment interactions,
+    trajectory storage, and provides built-in functionality for summarizing
+    and plotting results.
+
+    Parameters
+    ----------
+    env : object
+        The environment instance (standard or vectorized) following the Gym API.
+    agent : object
+        The agent instance implementing the RL interface (start, step, end, reset).
     """
+
     def __init__(self, env, agent):
+        """
+        Initialize the experiment runner.
+
+        Parameters
+        ----------
+        env : object
+            The environment instance.
+        agent : object
+            The agent instance.
+        """
+
         self.env = env
         self.agent = agent
         self.results = {}
 
     def _moving_average(self, data, window_size):
         """
-        Computes the simple moving average (SMA) of a 1D array.
-        Used internally for smoothing plot data.
+        Compute the simple moving average (SMA) of a 1D array.
+
+        Used internally for smoothing plot data. Handles NaN values correctly
+        by temporarily treating them as zeros during convolution.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Input 1D array of values to smooth.
+        window_size : int
+            Size of the moving average window.
+
+        Returns
+        -------
+        np.ndarray
+            Smoothed array of the same length as input, padded with NaNs
+            at the start to maintain alignment.
         """
+
         if window_size <= 1:
             return data
+        # Handle NaN values correctly for the moving average calculation
+        weights = np.ones(window_size)
+        weights_sum = np.sum(weights)
         
-        weights = np.ones(window_size) / window_size
-        return np.convolve(data, weights, mode='full')[:len(data)]
+        # Convolve data (treating NaN as 0 temporarily) and weights
+        data_nan_to_zero = np.nan_to_num(data)
+        smoothed_data = np.convolve(data_nan_to_zero, weights, 'valid') / weights_sum
+        
+        # Pad the start with NaNs so the length matches the original data length
+        # This keeps the x-axis alignment correct for plotting.
+        padding = np.full(window_size - 1, np.nan)
+        return np.concatenate((padding, smoothed_data))
 
     def run_episodic(self, num_runs, num_episodes, max_steps_per_episode=None):
-        """Runs the experiment for a single environment in an episodic setting."""
+        """
+        Run the experiment in an episodic setting.
+
+        Executes multiple runs of episodic training, storing rewards,
+        steps per episode, and full trajectories.
+
+        Parameters
+        ----------
+        num_runs : int
+            Number of independent runs to execute.
+        num_episodes : int
+            Number of episodes per run.
+        max_steps_per_episode : int, optional
+            Maximum steps allowed per episode. If None, episodes run until
+            environment termination.
+
+        Returns
+        -------
+        dict
+            Results dictionary containing:
+            - type : str, "episodic"
+            - rewards : np.ndarray, shape (num_episodes, num_runs)
+            - steps : np.ndarray, shape (num_episodes, num_runs)
+            - trajectories : list of dicts per run
+            - runtime_per_run : list of floats
+            - mean_rewards : np.ndarray, mean reward per episode across runs
+            - mean_steps : np.ndarray, mean steps per episode across runs
+        """
+
         rewards = np.zeros((num_episodes, num_runs))
         steps_per_episode = np.zeros((num_episodes, num_runs))
         trajectories = []  # store per-episode trajectories
@@ -83,7 +158,30 @@ class ExperimentRunner:
         return self.results
 
     def run_continuous(self, num_runs, num_steps):
-        """Runs the experiment for a single environment in a continuous steps setting."""
+        """
+        Run the experiment in a continuous setting.
+
+        Executes multiple runs of continuous training for a fixed number
+        of steps, storing rewards and full trajectories.
+
+        Parameters
+        ----------
+        num_runs : int
+            Number of independent runs to execute.
+        num_steps : int
+            Number of steps per run.
+
+        Returns
+        -------
+        dict
+            Results dictionary containing:
+            - type : str, "continuous"
+            - rewards : np.ndarray, shape (num_steps, num_runs)
+            - trajectories : list of dicts per run
+            - runtime_per_run : list of floats
+            - mean_rewards : np.ndarray, mean reward per step across runs
+        """
+
         rewards = np.zeros((num_steps, num_runs))
         trajectories = []  # store per-run trajectories
         runtime_per_run = []
@@ -126,13 +224,42 @@ class ExperimentRunner:
 
     def run_episodic_batch(self, num_runs, num_episodes, max_steps_per_episode=None):
         """
-        Runs the experiment using a vectorized environment and the agent's batch methods.
-        
-        This version correctly calls the agent's 'end_batch' method:
-        1. Per environment (i) immediately upon episode termination (using a single-element 
-        reward array, as required by SAC/PPO episode cleanup).
-        2. Once at the end of the run if PPO has a leftover partial rollout buffer.
+        Run the experiment in an episodic setting using a vectorized environment.
+
+        Executes multiple runs of episodic training with parallel environments,
+        storing rewards, steps per episode, and full trajectories. This version
+        correctly calls the agent's ``end_batch`` method both per environment
+        upon episode termination and once at the end of the run for on-policy
+        agents (e.g., PPO).
+
+        Parameters
+        ----------
+        num_runs : int
+            Number of independent runs to execute.
+        num_episodes : int
+            Number of episodes per run.
+        max_steps_per_episode : int, optional
+            Maximum steps allowed per episode. If None, episodes run until
+            environment termination.
+
+        Returns
+        -------
+        dict
+            Results dictionary containing:
+            - type : str, "episodic"
+            - rewards : np.ndarray, shape (max_episodes, num_runs), padded with NaNs
+            - steps : np.ndarray, shape (max_episodes, num_runs), padded with NaNs
+            - trajectories : list of lists of dicts per run
+            - runtime_per_run : list of floats
+            - mean_rewards : np.ndarray, mean reward per episode across runs
+            - mean_steps : np.ndarray, mean steps per episode across runs
+
+        Notes
+        -----
+        - Supports vectorized environments with multiple parallel episodes.
+        - Handles per-environment termination and resets trackers correctly.
         """
+
         
         # Check environment properties
         try:
@@ -173,7 +300,6 @@ class ExperimentRunner:
 
             pbar = tqdm(total=num_episodes, desc=f"Run {run+1}/{num_runs} - Episodes", leave=False)
 
-            # --- Main Loop ---
             while episodes_completed_in_run < num_episodes:
                 
                 # 1. Environment Step (N, ...)
@@ -280,7 +406,28 @@ class ExperimentRunner:
 
 
     def summary(self, last_n=10):
-        """Print a human-readable summary of the experiment results."""
+        """
+        Print a summary of experiment results.
+
+        Displays key statistics for episodic or continuous experiments,
+        including mean rewards, steps, and runtime information.
+
+        Parameters
+        ----------
+        last_n : int, optional
+            Number of episodes or steps to include in the "last N" summary
+            (default=10).
+
+        Notes
+        -----
+        - Episodic summary includes first, last, overall, and last-N mean rewards
+          and steps.
+        - Continuous summary includes first, last, overall, and last-N mean rewards.
+        - Uses NaN-safe operations to handle padded episodic results.
+        - Prints results directly to stdout.
+
+        """
+
         if not self.results:
             print("No results available. Run an experiment first.")
             return
@@ -325,18 +472,42 @@ class ExperimentRunner:
 
         print("="*60)
 
-    def plot_results(self, metric='reward', window_size=50):
+    def plot_results(self, metric='reward', window_size=50, max_reward=None):
         """
-        Generates a smoothed plot of the experiment results (mean and STD across runs).
+        Plot experiment results with smoothing and error bands.
 
-        CRITICAL FIX: Standard Deviation is NOT smoothed, only the mean is smoothed.
-        The instantaneous STD across runs is used for the error band to accurately 
-        reflect the variability at each time step.
+        Generates a learning curve or episode length curve depending on the
+        selected metric. Results are averaged across runs, smoothed using a
+        moving average, and displayed with a shaded error band representing
+        the standard deviation.
 
-        Args:
-            metric (str): 'reward' or 'step' (for episodic experiments).
-            window_size (int): The size of the moving average window for smoothing the MEAN.
+        Parameters
+        ----------
+        metric : str, optional
+            Metric to plot. Options:
+            - "reward" : plots mean total reward across runs.
+            - "step"   : plots mean episode length (episodic only).
+            Default is "reward".
+
+        window_size : int, optional
+            Window size for moving average smoothing (default=50).
+        max_reward : float, optional
+            Optional maximum reward reference line to plot (default=None).
+
+        Notes
+        -----
+        - Uses NaN-safe mean and standard deviation calculations to handle
+          padded episodic results.
+        - Smooths only the mean curve; error bands use raw standard deviation.
+        - Supports both episodic and continuous experiment types.
+        - Plots include grid, legend, and tight layout for readability.
+
+        Returns
+        -------
+        None
+            Displays a matplotlib plot of the selected metric.
         """
+
         if not self.results:
             print("No results available. Run an experiment first.")
             return
@@ -377,16 +548,17 @@ class ExperimentRunner:
         plot_x = x_axis[valid_indices]
         plot_mean = smoothed_mean[valid_indices]
         
-        # IMPORTANT: The raw STD must be aligned with the smoothed mean indices.
         plot_std = raw_std[valid_indices]
 
         # 5. Calculate the Bounds for the filled area (no arbitrary capping)
-        # Note: The raw STD is now correctly aligned and not artificially inflated by smoothing.
         lower_bound = plot_mean - plot_std
-        upper_bound = plot_mean + plot_std
+        upper_bound = np.minimum(plot_mean + plot_std, np.max(data)) if max_reward is not None else plot_mean + plot_std
 
         # 6. Plotting
         plt.figure(figsize=(10, 6))
+
+        if max_reward is not None:
+            plt.axhline(y=max_reward, color='r', linestyle='--', label=f'Max reward')
         
         # Plot the smoothed mean line
         plt.plot(plot_x, plot_mean, label=f'Smoothed Mean (Window={window_size})', linewidth=2)

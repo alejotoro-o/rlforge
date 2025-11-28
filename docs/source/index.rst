@@ -26,6 +26,12 @@ Welcome to rlforge's documentation!
 
 .. toctree::
    :maxdepth: 1
+   :caption: Experiment Runner
+
+   experiment_runner
+
+.. toctree::
+   :maxdepth: 1
    :caption: Policies
 
    policies

@@ -13,6 +13,7 @@ class ShortCorridor(gym.Env):
     The Short Corridor Gridworld (Sutton & Barto Example 13.1).
 
     The environment has 4 states (0, 1, 2, 3), where 3 is the terminal state.
+    
     - Start state is S=0.
     - Reward is -1 per step until the terminal state is reached. (Note: The description 
       says "reward is 1 per step, as usual" for the example, but the goal is to minimize 
@@ -20,9 +21,10 @@ class ShortCorridor(gym.Env):
       standard shortest-path/episodic formulation.)
     - Actions are LEFT (0) and RIGHT (1).
     - Transitions:
-        - State 0: LEFT -> 0 (stay), RIGHT -> 1
-        - State 1: LEFT -> 0, RIGHT -> 2 (Reversed!)
-        - State 2: LEFT -> 1, RIGHT -> 3 (Terminal)
+
+        * State 0: LEFT -> 0 (stay), RIGHT -> 1
+        * State 1: LEFT -> 0, RIGHT -> 2 (Reversed!)
+        * State 2: LEFT -> 1, RIGHT -> 3 (Terminal)
     
     The observation returned is controlled by `observation_type`.
     """
@@ -62,11 +64,15 @@ class ShortCorridor(gym.Env):
 
     @property
     def actions(self):
-        """Helper property for action indices."""
+        """
+        Helper property for action indices.
+        """
         return list(range(self.action_space.n))
 
     def _build_transitions(self):
-        """Defines the transition dynamics based on the Short Corridor problem."""
+        """
+        Defines the transition dynamics based on the Short Corridor problem.
+        """
         
         # State 0 (Non-terminal)
         self.P[0][LEFT] = [(1.0, 0, -1.0, False)]  # Stay at 0
@@ -90,7 +96,8 @@ class ShortCorridor(gym.Env):
         
         - 'tabular': Returns the state index.
         - 'feature': Returns the feature vector x(s, a). Note that the feature vector 
-          is solely dependent on the *action taken* for this specific problem (perceptual aliasing).
+            is solely dependent on the *action taken* for this specific problem (perceptual aliasing).
+        
         """
         if self.observation_type == 'tabular':
             return self.s
