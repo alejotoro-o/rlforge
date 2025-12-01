@@ -1,0 +1,8 @@
+.wy-side-nav-search a {
+    background-color: #ffffff;
+    border-radius: 20px;
+
+    &:hover {
+        background-color: #c8c8c8
+    }
+}

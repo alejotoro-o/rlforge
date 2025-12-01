@@ -10,9 +10,6 @@ In addition to these built-in environments, RLForge is fully compatible with all
 `Gymnasium <https://gymnasium.farama.org/index.html>`_ environments, allowing you
 to extend experiments to a wide variety of standardized benchmarks.
 
-Available environments
------------------------
-
 - **Bandits** — a simple environment family for testing exploration strategies
   and reward maximization in multi-armed bandit problems.
 - **Dyna Maze** — a grid-based maze environment ideal for testing planning and

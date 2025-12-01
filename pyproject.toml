@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=80.9"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,14 +10,14 @@ authors = [
 ]
 description = "Reinforcement Learning for Everyone."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 keywords = ["reinforcement learning", "machine learning"]
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE*"]
 dependencies = [
     "numpy>=2.3.4",
     "tqdm>=4.67.1",

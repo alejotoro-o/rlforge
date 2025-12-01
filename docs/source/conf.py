@@ -39,3 +39,10 @@ html_static_path = ['_static']
 html_sidebars = {
     "**": ["globaltoc.html", "relations.html", "searchbox.html"]
 }
+html_logo = "_static/logo.svg"
+html_theme_options = {
+    "logo_only": True, 
+}
+html_css_files = [
+    'custom.css',
+]
