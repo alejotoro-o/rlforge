@@ -49,7 +49,7 @@ pip install rlforge
 This will download and install the latest stable release of `rlforge` available in the
 [Python Package Index](https://pypi.org/project/rlforge/).
 
-RLForge works with **Python 3.9 or later**. Installing with `pip` will automatically
+RLForge works with **Python 3.11 or later**. Installing with `pip` will automatically
 download all required dependencies if they are not already present.
 
 ### Optional PyTorch Support

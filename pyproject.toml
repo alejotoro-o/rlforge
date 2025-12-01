@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlforge"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
     { name="Alejandro Toro-Ossaba", email="alejotoro.o@gmail.com" },
 ]
 description = "Reinforcement Learning for Everyone."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
