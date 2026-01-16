@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlforge"
-version = "1.0.2"
+version = "1.0.3"
 authors = [
     { name="Alejandro Toro-Ossaba", email="alejotoro.o@gmail.com" },
 ]
