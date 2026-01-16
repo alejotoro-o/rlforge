@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 project = 'rlforge'
 copyright = '2025, Alejandro Toro-Ossaba'
 author = 'Alejandro Toro-Ossaba'
-release = '1.0.0'
+release = '1.0.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

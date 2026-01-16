@@ -3,8 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal, Independent
-from ..base_agent import BaseAgent # Assuming BaseAgent is available
-import copy
+from ..base_agent import BaseAgent
 
 class PPOContinuous(BaseAgent):
     """
@@ -671,3 +670,63 @@ class PPOContinuous(BaseAgent):
         self.prev_action = None
         self.prev_log_prob = None
         self.prev_value = None
+
+    def save(self, path):
+        """
+        Save the agent's state to a file.
+
+        This includes the state dictionaries for the policy and value networks,
+        the learnable log standard deviation, and both optimizers.
+
+        Parameters
+        ----------
+        path : str
+            The file path where the state should be saved.
+        """
+        state = {
+            'policy_net_state_dict': self.policy_net.state_dict(),
+            'value_net_state_dict': self.value_net.state_dict(),
+            'log_std': self.log_std,
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'critic_opt_state_dict': self.critic_opt.state_dict(),
+            'network_architecture': self.network_architecture,
+            'tanh_squash': self.tanh_squash
+        }
+        torch.save(state, path)
+
+    def load(self, path):
+        """
+        Load the agent's state from a file.
+
+        Restores the networks, the log standard deviation, and the optimizers.
+        If the saved network architecture differs from the current one, the 
+        networks are rebuilt to match the saved state.
+
+        Parameters
+        ----------
+        path : str
+            The file path from which to load the state.
+        """
+        # map_location ensures loading to the correct device
+        state = torch.load(path, map_location=self.device)
+
+        # Handle architecture mismatch if necessary
+        if state.get('network_architecture') != self.network_architecture:
+            self.network_architecture = state['network_architecture']
+            self.policy_net = self._create_network(self.state_dim, self.action_dim).to(self.device)
+            self.value_net = self._create_network(self.state_dim, 1).to(self.device)
+            # Re-init optimizers as parameter references have changed
+            self.actor_opt = optim.Adam(list(self.policy_net.parameters()) + [self.log_std], lr=self.actor_lr)
+            self.critic_opt = optim.Adam(self.value_net.parameters(), lr=self.critic_lr)
+
+        self.policy_net.load_state_dict(state['policy_net_state_dict'])
+        self.value_net.load_state_dict(state['value_net_state_dict'])
+        
+        # Restore learnable parameter
+        with torch.no_grad():
+            self.log_std.copy_(state['log_std'])
+            
+        self.actor_opt.load_state_dict(state['actor_opt_state_dict'])
+        self.critic_opt.load_state_dict(state['critic_opt_state_dict'])
+        
+        self.tanh_squash = state.get('tanh_squash', self.tanh_squash)

@@ -5,9 +5,7 @@ import torch.optim as optim
 from collections import deque
 import random
 from copy import deepcopy
-from ..base_agent import BaseAgent # Assuming BaseAgent is available
-
-# Note: DDPG does not use stochastic policy, so no torch.distributions needed.
+from ..base_agent import BaseAgent
 
 class DDPGAgent(BaseAgent): 
     """
@@ -670,3 +668,50 @@ class DDPGAgent(BaseAgent):
         self.prev_state = None
         self.prev_action = None
         self.prev_deterministic_action = None
+
+    def save(self, path):
+        """
+        Save the agent's parameters and optimizer states to a file.
+
+        Parameters
+        ----------
+        path : str
+            The file path where the agent's state should be saved.
+        """
+        torch.save({
+            'policy_net_state_dict': self.policy_net.state_dict(),
+            'target_policy_net_state_dict': self.target_policy_net.state_dict(),
+            'q_net_state_dict': self.q_net.state_dict(),
+            'target_q_net_state_dict': self.target_q_net.state_dict(),
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'critic_opt_state_dict': self.critic_opt.state_dict(),
+            'total_steps': self.total_steps,
+        }, path)
+
+    def load(self, path):
+        """
+        Load the agent's parameters and optimizer states from a file.
+
+        Parameters
+        ----------
+        path : str
+            The file path from which to load the agent's state.
+        """
+        checkpoint = torch.load(path, map_location=self.device)
+        
+        # Load network weights
+        self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
+        self.target_policy_net.load_state_dict(checkpoint['target_policy_net_state_dict'])
+        self.q_net.load_state_dict(checkpoint['q_net_state_dict'])
+        self.target_q_net.load_state_dict(checkpoint['target_q_net_state_dict'])
+        
+        # Load optimizer states
+        self.actor_opt.load_state_dict(checkpoint['actor_opt_state_dict'])
+        self.critic_opt.load_state_dict(checkpoint['critic_opt_state_dict'])
+        
+        # Load training counters
+        self.total_steps = checkpoint.get('total_steps', 0)
+        
+        # Ensure target networks are in eval mode and moved to correct device
+        self._set_device_and_train_mode(self.target_policy_net, False)
+        self._set_device_and_train_mode(self.target_q_net, False)

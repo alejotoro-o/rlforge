@@ -677,3 +677,69 @@ class TD3Agent(BaseAgent):
         self.total_steps = 0
         self.prev_state = None
         self.prev_action = None
+
+    def save(self, filepath):
+        """
+        Save the agent's complete state to a file.
+
+        This saves the state_dicts for the policy network, both twin critics, 
+        and all three optimizers. This ensures that training can be 
+        resumed exactly where it left off.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the file where the state should be saved.
+        """
+        state = {
+            'policy_net': self.policy_net.state_dict(),
+            'q_net1': self.q_net1.state_dict(),
+            'q_net2': self.q_net2.state_dict(),
+            'actor_opt': self.actor_opt.state_dict(),
+            'critic_opt1': self.critic_opt1.state_dict(),
+            'critic_opt2': self.critic_opt2.state_dict(),
+            'total_steps': self.total_steps
+        }
+        torch.save(state, filepath)
+
+    def load(self, filepath):
+        """
+        Load the agent's state from a file.
+
+        This method updates all active networks and optimizers, and 
+        immediately synchronizes the target networks to match the loaded 
+        weights using a hard copy.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the file containing the saved state.
+        """
+        checkpoint = torch.load(filepath, map_location=self.device)
+
+        # Load active networks
+        self.policy_net.load_state_dict(checkpoint['policy_net'])
+        self.q_net1.load_state_dict(checkpoint['q_net1'])
+        self.q_net2.load_state_dict(checkpoint['q_net2'])
+
+        # Load optimizers
+        self.actor_opt.load_state_dict(checkpoint['actor_opt'])
+        self.critic_opt1.load_state_dict(checkpoint['critic_opt1'])
+        self.critic_opt2.load_state_dict(checkpoint['critic_opt2'])
+        
+        # Restore training step counter
+        self.total_steps = checkpoint.get('total_steps', 0)
+
+        # Synchronize Target Networks (Hard Update)
+        # In TD3, target networks must start identical to the main networks
+        self.target_policy_net.load_state_dict(self.policy_net.state_dict())
+        self.target_q_net1.load_state_dict(self.q_net1.state_dict())
+        self.target_q_net2.load_state_dict(self.q_net2.state_dict())
+
+        # Ensure correct modes
+        self.policy_net.train()
+        self.q_net1.train()
+        self.q_net2.train()
+        self.target_policy_net.eval()
+        self.target_q_net1.eval()
+        self.target_q_net2.eval()

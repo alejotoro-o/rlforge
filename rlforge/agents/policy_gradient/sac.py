@@ -698,3 +698,66 @@ class SACAgent(BaseAgent):
         self.total_steps = 0
         self.prev_state = None
         self.prev_action = None
+
+    def save(self, filepath):
+        """
+        Save the agent's state (networks, optimizers, and parameters) to a file.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the file where the state dictionary will be saved.
+        """
+        state_dict = {
+            # Networks
+            'policy_net_state_dict': self.policy_net.state_dict(),
+            'q_net1_state_dict': self.q_net1.state_dict(),
+            'q_net2_state_dict': self.q_net2.state_dict(),
+            'target_q_net1_state_dict': self.target_q_net1.state_dict(),
+            'target_q_net2_state_dict': self.target_q_net2.state_dict(),
+            
+            # Optimizers
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'critic_opt1_state_dict': self.critic_opt1.state_dict(),
+            'critic_opt2_state_dict': self.critic_opt2.state_dict(),
+            'alpha_opt_state_dict': self.alpha_opt.state_dict(),
+            
+            # Parameters and Scalars
+            'log_std': self.log_std,
+            'log_alpha': self.log_alpha,
+            'alpha': self.alpha,
+            'target_entropy': self.target_entropy,
+            'total_steps': self.total_steps
+        }
+        torch.save(state_dict, filepath)
+
+    def load(self, filepath):
+        """
+        Load the agent's state from a file.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the file containing the saved state dictionary.
+        """
+        checkpoint = torch.load(filepath, map_location=self.device)
+        
+        # Restore Networks
+        self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
+        self.q_net1.load_state_dict(checkpoint['q_net1_state_dict'])
+        self.q_net2.load_state_dict(checkpoint['q_net2_state_dict'])
+        self.target_q_net1.load_state_dict(checkpoint['target_q_net1_state_dict'])
+        self.target_q_net2.load_state_dict(checkpoint['target_q_net2_state_dict'])
+        
+        # Restore Parameters (Using data copy to maintain Parameter identity if needed)
+        self.log_std.data.copy_(checkpoint['log_std'].data)
+        self.log_alpha.data.copy_(checkpoint['log_alpha'].data)
+        self.alpha = checkpoint['alpha']
+        self.target_entropy = checkpoint['target_entropy']
+        self.total_steps = checkpoint['total_steps']
+        
+        # Restore Optimizers
+        self.actor_opt.load_state_dict(checkpoint['actor_opt_state_dict'])
+        self.critic_opt1.load_state_dict(checkpoint['critic_opt1_state_dict'])
+        self.critic_opt2.load_state_dict(checkpoint['critic_opt2_state_dict'])
+        self.alpha_opt.load_state_dict(checkpoint['alpha_opt_state_dict'])

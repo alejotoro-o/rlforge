@@ -12,7 +12,7 @@ This will download and install the latest stable release of ``rlforge`` availabl
 
 Requirements
 ------------
-RLForge works with **Python 3.11 or later** and depends on:
+RLForge works with **Python 3.10 or later** and depends on:
 
 - `NumPy <https://numpy.org/>`_ (numerical computations)
 - `tqdm <https://tqdm.github.io/>`_ (progress bars)
@@ -60,18 +60,18 @@ For reference, RLForge’s ``pyproject.toml`` specifies:
 .. code-block:: toml
 
     [build-system]
-    requires = ["setuptools>=61.0"]
+    requires = ["setuptools>=80.9"]
     build-backend = "setuptools.build_meta"
 
     [project]
     name = "rlforge"
-    version = "1.0.0"
+    version = "1.0.2"
     authors = [
         { name="Alejandro Toro-Ossaba", email="alejotoro.o@gmail.com" },
     ]
     description = "Reinforcement Learning for Everyone."
     readme = "README.md"
-    requires-python = ">=3.11"
+    requires-python = ">=3.10"
     classifiers = [
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

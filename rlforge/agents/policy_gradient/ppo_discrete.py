@@ -536,3 +536,79 @@ class PPODiscrete(BaseAgent):
         self.prev_action = None
         self.prev_log_prob = None
         self.prev_value = None
+
+    def save(self, filepath):
+        """
+        Save the agent's state to a file.
+
+        This method serializes the policy and value networks, their respective 
+        optimizers, and all relevant hyperparameters into a single dictionary 
+        stored as a PyTorch checkpoint.
+
+        Parameters
+        ----------
+        filepath : str
+            The destination path where the model should be saved (e.g., 'ppo_agent.pt').
+
+        Returns
+        -------
+        None
+        """
+        checkpoint = {
+            'policy_net_state_dict': self.policy_net.state_dict(),
+            'value_net_state_dict': self.value_net.state_dict(),
+            'actor_opt_state_dict': self.actor_opt.state_dict(),
+            'critic_opt_state_dict': self.critic_opt.state_dict(),
+            'hyperparameters': {
+                'state_dim': self.state_dim,
+                'num_actions': self.num_actions,
+                'actor_lr': self.actor_lr,
+                'critic_lr': self.critic_lr,
+                'discount': self.discount,
+                'clip_epsilon': self.clip_epsilon,
+                'network_architecture': self.network_architecture,
+                'update_epochs': self.update_epochs,
+                'mini_batch_size': self.mini_batch_size,
+                'rollout_length': self.rollout_length,
+                'value_coef': self.value_coef,
+                'entropy_coeff': self.entropy_coeff,
+                'gae_lambda': self.gae_lambda
+            }
+        }
+        torch.save(checkpoint, filepath)
+
+    def load(self, filepath):
+        """
+        Load the agent's state from a file.
+
+        Restores the network weights, optimizer states, and verifies that the 
+        stored hyperparameters match the current agent configuration.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the PyTorch checkpoint file.
+
+        Returns
+        -------
+        None
+        """
+        # map_location ensures we load correctly regardless of whether the file was saved on GPU or CPU
+        checkpoint = torch.load(filepath, map_location=self.device)
+
+        # Restore network weights
+        self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
+        self.value_net.load_state_dict(checkpoint['value_net_state_dict'])
+
+        # Restore optimizer states
+        self.actor_opt.load_state_dict(checkpoint['actor_opt_state_dict'])
+        self.critic_opt.load_state_dict(checkpoint['critic_opt_state_dict'])
+
+        # Sync hyperparameters (useful for logging or verification)
+        hparams = checkpoint['hyperparameters']
+        self.state_dim = hparams['state_dim']
+        self.num_actions = hparams['num_actions']
+        
+        # Ensure the agent stays on the correct device after loading
+        self.policy_net.to(self.device)
+        self.value_net.to(self.device)

@@ -573,3 +573,46 @@ class DQNTorchAgent(BaseAgent):
         self.total_steps = 0
         self.prev_state = None
         self.prev_action = None
+
+    def save(self, filepath):
+        """
+        Save the agent's main network weights to a file.
+
+        This method saves the state dictionary of the main Q-network, 
+        allowing the agent's learned policy to be retrieved later.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the file where the weights should be saved 
+            (typically ending in .pth or .pt).
+        """
+        torch.save(self.main_network.state_dict(), filepath)
+
+    def load(self, filepath):
+        """
+        Load network weights from a file.
+
+        This method updates the main network with the saved weights and 
+        immediately synchronizes the target network to match.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the file containing the saved state dictionary.
+
+        Notes
+        -----
+        The networks are set to evaluation mode during loading and then 
+        returned to their previous state.
+        """
+        # map_location ensures we can load weights even if device (CPU/GPU) differs from save time
+        state_dict = torch.load(filepath, map_location=self.device)
+        self.main_network.load_state_dict(state_dict)
+        
+        # Ensure target network is identical to the newly loaded main network
+        self._sync_target_network()
+        
+        # Ensure networks are in the correct mode after loading
+        self.main_network.train()
+        self.target_network.eval()

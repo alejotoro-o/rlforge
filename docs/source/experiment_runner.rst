@@ -1,5 +1,5 @@
 Experiment Runner
 =================
 
-.. automodule:: rlforge.experiments
+.. automodule:: rlforge.experiments.experiment_runner
    :members: 
