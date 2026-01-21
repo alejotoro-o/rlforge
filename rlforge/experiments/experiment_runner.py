@@ -2,6 +2,8 @@ import numpy as np
 from tqdm import tqdm
 import time
 import matplotlib.pyplot as plt
+import os
+import pickle
 
 class ExperimentRunner:
     """
@@ -96,25 +98,26 @@ class ExperimentRunner:
             - type : str, "episodic"
             - rewards : np.ndarray, shape (num_episodes, num_runs)
             - steps : np.ndarray, shape (num_episodes, num_runs)
-            - trajectories : list of dicts per run
-            - runtime_per_run : list of floats
             - mean_rewards : np.ndarray, mean reward per episode across runs
+            - std_rewards : np.ndarray, std dev of reward per episode across runs
             - mean_steps : np.ndarray, mean steps per episode across runs
+            - std_steps : np.ndarray, std dev of steps per episode across runs
+            - runtime_per_run : np.ndarray, duration of each run in seconds
+            - total_runtime : float, total duration of the experiment
         """
 
         rewards = np.zeros((num_episodes, num_runs))
         steps_per_episode = np.zeros((num_episodes, num_runs))
-        trajectories = []  # store per-episode trajectories
         runtime_per_run = []
 
-        episodes = np.arange(num_episodes)
+        experiment_start = time.time()
 
         for run in range(num_runs):
             run_start = time.time()
             self.agent.reset()
             run_trajectories = []
 
-            for episode in tqdm(episodes, desc=f"Run {run+1}/{num_runs} - Episodes", leave=False):
+            for episode in tqdm(range(num_episodes), desc=f"Run {run+1}/{num_runs} - Episodes", leave=False):
                 new_state = self.env.reset()[0]
                 steps, total_reward, is_terminal = 0, 0, False
                 action = self.agent.start(new_state)
@@ -129,32 +132,25 @@ class ExperimentRunner:
                     total_reward += reward
                     steps += 1
 
-                    episode_states.append(new_state)
-                    episode_actions.append(action)
-                    episode_rewards.append(reward)
-
                 rewards[episode, run] = total_reward
                 steps_per_episode[episode, run] = steps
-                run_trajectories.append({
-                    "states": episode_states,
-                    "actions": episode_actions[:-1], # Remove the action after terminal state
-                    "rewards": episode_rewards,
-                    "total_reward": total_reward,
-                    "steps": steps
-                })
 
             runtime_per_run.append(time.time() - run_start)
-            trajectories.append(run_trajectories)
+
+        total_runtime = time.time() - experiment_start
 
         self.results = {
             "type": "episodic",
             "rewards": rewards,
             "steps": steps_per_episode,
-            "trajectories": trajectories,
-            "runtime_per_run": runtime_per_run,
             "mean_rewards": np.mean(rewards, axis=1),
+            "std_rewards": np.std(rewards, axis=1),
             "mean_steps": np.mean(steps_per_episode, axis=1),
+            "std_steps": np.std(steps_per_episode, axis=1),
+            "runtime_per_run": runtime_per_run,
+            "total_runtime": total_runtime,
         }
+        
         return self.results
 
     def run_continuous(self, num_runs, num_steps):
@@ -247,12 +243,14 @@ class ExperimentRunner:
         dict
             Results dictionary containing:
             - type : str, "episodic"
-            - rewards : np.ndarray, shape (max_episodes, num_runs), padded with NaNs
-            - steps : np.ndarray, shape (max_episodes, num_runs), padded with NaNs
-            - trajectories : list of lists of dicts per run
+            - rewards : np.ndarray, shape (max_episodes, num_runs)
+            - steps : np.ndarray, shape (max_episodes, num_runs)
             - runtime_per_run : list of floats
+            - total_runtime : float
             - mean_rewards : np.ndarray, mean reward per episode across runs
+            - std_rewards : np.ndarray, std reward per episode across runs
             - mean_steps : np.ndarray, mean steps per episode across runs
+            - std_steps : np.ndarray, std steps per episode across runs
 
         Notes
         -----
@@ -267,35 +265,27 @@ class ExperimentRunner:
         except AttributeError:
             num_envs = 1
             
-        rewards_list = []
-        steps_list = []
-        trajectories = [] # store per-run trajectories (list of lists of episode dicts)
+        all_run_rewards = []
+        all_run_steps = []
         runtime_per_run = []
+
+        total_start_time = time.time()
 
         for run in range(num_runs):
             run_start = time.time()
             self.agent.reset()
-            run_trajectories = []
             
             # --- Per-Run Episode Tracking ---
             episode_steps_tracker = np.zeros(num_envs, dtype=int)
             total_rewards_tracker = np.zeros(num_envs, dtype=np.float32)
 
-            episode_info = [
-                {'states': [], 'actions': [], 'rewards': []}
-                for _ in range(num_envs)
-            ]
+            run_rewards_collector = []
+            run_steps_collector = []
             
             # Reset environment and get initial batch of states (N, state_dim)
             obs, _ = self.env.reset()
             actions = self.agent.start_batch(obs)
-
-            # Record initial states and actions for all N parallel trajectories
-            for i in range(num_envs):
-                episode_info[i]['states'].append(obs[i])
-                episode_info[i]['actions'].append(actions[i])
                 
-            steps_in_run = 0
             episodes_completed_in_run = 0
 
             pbar = tqdm(total=num_episodes, desc=f"Run {run+1}/{num_runs} - Episodes", leave=False)
@@ -315,31 +305,17 @@ class ExperimentRunner:
                 # 2. Update Trackers (for N parallel environments)
                 total_rewards_tracker += rewards
                 episode_steps_tracker += 1
-                steps_in_run += num_envs
 
                 # 3. Agent Update
                 actions = self.agent.step_batch(rewards, next_obs, is_terminal)
 
                 # 4. Process Completed Episodes (Crucial for batch tracking)
                 for i in range(num_envs):
-                    # Record the current reward, next state, and action taken *next* (A_{t+1})
-                    episode_info[i]['rewards'].append(rewards[i])
-                    episode_info[i]['states'].append(next_obs[i])
-                    episode_info[i]['actions'].append(actions[i])
 
                     if is_terminal[i]:
-                        # A. Store final episode results
-                        final_trajectory = {
-                            "states": episode_info[i]['states'],
-                            # actions list contains [A_0, A_1, ..., A_T, A_{T+1}], we only keep A_0..A_T
-                            "actions": np.array(episode_info[i]['actions'])[:-1].tolist(), 
-                            "rewards": episode_info[i]['rewards'],
-                            "total_reward": total_rewards_tracker[i],
-                            "steps": episode_steps_tracker[i] # This is the CORRECT final step count
-                        }
-                        run_trajectories.append(final_trajectory)
-                        rewards_list.append(total_rewards_tracker[i])
-                        steps_list.append(episode_steps_tracker[i])
+                        # A. Store results
+                        run_rewards_collector.append(total_rewards_tracker[i])
+                        run_steps_collector.append(episode_steps_tracker[i])
 
                         # B. Check Quota and Break Cleanly (CRITICAL: Break before reset)
                         episodes_completed_in_run += 1
@@ -348,16 +324,10 @@ class ExperimentRunner:
                         if episodes_completed_in_run >= num_episodes:
                             break # Exit inner loop, preventing the next steps from corrupting state
                             
-                        # C. Reset episode trackers for this environment (FIX: Reset to 0)
+                        # C. Reset episode trackers for this environment
                         total_rewards_tracker[i] = 0.0
                         episode_steps_tracker[i] = 0
                         
-                        # D. Prepare for new episode (reset local trajectory buffer)
-                        episode_info[i] = {'states': [], 'actions': [], 'rewards': []}
-                        
-                        # E. Start the new episode's trajectory with the current state (next_obs[i]) and action (actions[i]).
-                        episode_info[i]['states'].append(next_obs[i])
-                        episode_info[i]['actions'].append(actions[i])
                         
                 if episodes_completed_in_run >= num_episodes:
                     # Need to break the main while loop as well
@@ -367,41 +337,40 @@ class ExperimentRunner:
                 self.agent.end_batch(rewards) 
             
             pbar.close()
-
-            # Final 'end_batch' call for ON-POLICY agents (PPO) only
-            # This handles a partial, non-terminal rollout buffer at the end of the *run*.
-            # Here, we pass the full N rewards array.
-            # if hasattr(self.agent, 'step_count') and self.agent.step_count > 0:
-            #     self.agent.end_batch(total_rewards_tracker)
                 
             runtime_per_run.append(time.time() - run_start)
-            trajectories.append(run_trajectories)
+            all_run_rewards.append(run_rewards_collector)
+            all_run_steps.append(run_steps_collector)
+
+        total_runtime = time.time() - total_start_time
 
         # 5. Format Results (Handling variable episode counts per run using np.nan)
-        if not trajectories:
-            self.results = {}
-            return self.results
+        if not all_run_rewards:
+            return {}
             
-        max_episodes_in_any_run = max(len(t) for t in trajectories)
+        max_eps = max(len(r) for r in all_run_rewards)
         
-        rewards = np.full((max_episodes_in_any_run, num_runs), np.nan)
-        steps_per_episode = np.full((max_episodes_in_any_run, num_runs), np.nan)
+        rewards_matrix = np.full((max_eps, num_runs), np.nan)
+        steps_matrix = np.full((max_eps, num_runs), np.nan)
         
-        for run, run_traj in enumerate(trajectories):
-            run_rewards = [t["total_reward"] for t in run_traj]
-            run_steps = [t["steps"] for t in run_traj]
-            rewards[:len(run_rewards), run] = run_rewards
-            steps_per_episode[:len(run_steps), run] = run_steps
+        for run_idx in range(num_runs):
+            r_data = all_run_rewards[run_idx]
+            s_data = all_run_steps[run_idx]
+            rewards_matrix[:len(r_data), run_idx] = r_data
+            steps_matrix[:len(s_data), run_idx] = s_data
             
         self.results = {
             "type": "episodic",
-            "rewards": rewards, 
-            "steps": steps_per_episode, 
-            "trajectories": trajectories, 
+            "rewards": rewards_matrix, 
+            "steps": steps_matrix, 
             "runtime_per_run": runtime_per_run,
-            "mean_rewards": np.mean(rewards, axis=1),
-            "mean_steps": np.mean(steps_per_episode, axis=1),
+            "total_runtime": total_runtime,
+            "mean_rewards": np.nanmean(rewards_matrix, axis=1),
+            "std_rewards": np.nanstd(rewards_matrix, axis=1),
+            "mean_steps": np.nanmean(steps_matrix, axis=1),
+            "std_steps": np.nanstd(steps_matrix, axis=1),
         }
+        
         return self.results
 
 
@@ -433,42 +402,69 @@ class ExperimentRunner:
             return
 
         exp_type = self.results.get("type", "unknown")
-        avg_runtime = np.mean(self.results.get("runtime_per_run", []))
+        runtime_data = self.results.get("runtime_per_run", [])
+        avg_runtime = np.mean(runtime_data) if len(runtime_data) > 0 else 0
+        total_runtime = self.results.get("total_runtime", 0)
 
         print("="*60)
         print(f" Experiment Summary ({exp_type.capitalize()})")
         print("="*60)
-        print(f"Runs: {len(self.results.get('runtime_per_run', []))}")
-        print(f"Average runtime per run: {avg_runtime:.3f} seconds")
+        print(f"Runs:                    {len(runtime_data)}")
+        print(f"Total Runtime:           {total_runtime:.3f} seconds")
+        print(f"Average Runtime/Run:     {avg_runtime:.3f} seconds")
+        print("-"*60)
 
         if exp_type == "episodic":
-            # Using rewards directly as the array might be padded with NaNs
+
             rewards_data = self.results["rewards"]
+            steps_data = self.results["steps"]
             num_episodes = rewards_data.shape[0]
             
-            # Use nanmean to correctly handle NaN padding
-            print(f"Episodes per run (Max): {num_episodes}")
-            print(f"First episode mean reward: {np.nanmean(rewards_data[0, :]):.3f}")
-            print(f"Last episode mean reward: {np.nanmean(rewards_data[-1, :]):.3f}")
-            print(f"Overall mean reward: {np.nanmean(rewards_data):.3f}")
-            print(f"Mean reward (last {last_n} episodes): "
-                  f"{np.nanmean(rewards_data[-last_n:]):.3f}")
+            # Calculate standard deviations across runs for the summary points
+            # Using ddof=1 for sample standard deviation
+            def get_stats(data_row):
+                return np.nanmean(data_row), np.nanstd(data_row)
 
-            # Steps data (optional)
-            steps_data = self.results["steps"]
+            print(f"Episodes per run (Max):  {num_episodes}")
+            
+            # Reward Statistics
+            f_m, f_s = get_stats(rewards_data[0, :])
+            l_m, l_s = get_stats(rewards_data[-1, :])
+            o_m, o_s = np.nanmean(rewards_data), np.nanstd(rewards_data)
+            ln_m, ln_s = np.nanmean(rewards_data[-last_n:]), np.nanstd(rewards_data[-last_n:])
+
+            print(f"\nREWARDS")
+            print(f"First Episode:           {f_m:.3f} ± {f_s:.3f}")
+            print(f"Last Episode:            {l_m:.3f} ± {l_s:.3f}")
+            print(f"Overall Mean:            {o_m:.3f} ± {o_s:.3f}")
+            label = f"Last {last_n} Episodes:"
+            print(f"{label:<25}{ln_m:.3f} ± {ln_s:.3f}")
+
+            # Steps Statistics
             if steps_data.size > 0:
-                print(f"First episode mean steps: {np.nanmean(steps_data[0, :]):.1f}")
-                print(f"Last episode mean steps: {np.nanmean(steps_data[-1, :]):.1f}")
-                print(f"Overall mean steps: {np.nanmean(steps_data):.1f}")
+                sf_m, sf_s = get_stats(steps_data[0, :])
+                sl_m, sl_s = get_stats(steps_data[-1, :])
+                so_m, so_s = np.nanmean(steps_data), np.nanstd(steps_data)
+
+                print(f"\nSTEPS")
+                print(f"First Episode:           {sf_m:.1f} ± {sf_s:.1f}")
+                print(f"Last Episode:            {sl_m:.1f} ± {sl_s:.1f}")
+                print(f"Overall Mean:            {so_m:.1f} ± {so_s:.1f}")
 
         elif exp_type == "continuous":
-            num_steps = self.results["rewards"].shape[0]
-            print(f"Steps per run: {num_steps}")
-            print(f"First step mean reward: {self.results['mean_rewards'][0]:.3f}")
-            print(f"Last step mean reward: {self.results['mean_rewards'][-1]:.3f}")
-            print(f"Overall mean reward: {np.mean(self.results['mean_rewards']):.3f}")
-            print(f"Mean reward (last {last_n} steps): "
-                  f"{np.mean(self.results['mean_rewards'][-last_n:]):.3f}")
+
+            rewards_data = self.results["rewards"]
+            num_steps = rewards_data.shape[0]
+            
+            o_m, o_s = np.nanmean(rewards_data), np.nanstd(rewards_data)
+            ln_m, ln_s = np.nanmean(rewards_data[-last_n:]), np.nanstd(rewards_data[-last_n:])
+
+            print(f"Steps per run:           {num_steps}")
+            print(f"\nREWARDS")
+            print(f"First Step:              {np.nanmean(rewards_data[0, :]):.3f}")
+            print(f"Last Step:               {np.nanmean(rewards_data[-1, :]):.3f}")
+            print(f"Overall Mean:            {o_m:.3f} ± {o_s:.3f}")
+            print(f"Last {last_n:3d} Steps:         {ln_m:.3f} ± {ln_s:.3f}")
 
         print("="*60)
 
@@ -573,3 +569,59 @@ class ExperimentRunner:
         plt.legend()
         plt.tight_layout()
         plt.show()
+
+    def save_results(self, filepath):
+        """
+        Saves the experiment results dictionary to a file using pickle.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the file where results should be saved (e.g., 'results.pkl').
+        """
+        if not hasattr(self, 'results') or not self.results:
+            print("Warning: No results found to save.")
+            return
+
+        try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(filepath), exist_ok=True) if os.path.dirname(filepath) else None
+            
+            with open(filepath, 'wb') as f:
+                pickle.dump(self.results, f)
+            print(f"Results successfully saved to {filepath}")
+        except Exception as e:
+            print(f"Error saving results: {e}")
+
+    def load_results(self, filepath):
+        """
+        Loads experiment results from a pickle file and assigns them to self.results.
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the pickle file.
+
+        Returns
+        -------
+        dict
+            The loaded results dictionary.
+        """
+        try:
+            with open(filepath, 'rb') as f:
+                loaded_data = pickle.load(f)
+                
+            self.results = loaded_data
+            print(f"Results successfully loaded from {filepath}")
+            
+            # Quick summary of what was loaded
+            if isinstance(self.results, dict):
+                r_shape = self.results.get('rewards', np.array([])).shape
+                print(f"Loaded {self.results.get('type', 'unknown')} results with shape {r_shape}")
+                
+            return self.results
+        except FileNotFoundError:
+            print(f"Error: File {filepath} not found.")
+        except Exception as e:
+            print(f"Error loading results: {e}")
+            return None
